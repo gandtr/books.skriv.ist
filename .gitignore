@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env*
+.wrangler/
+.DS_Store
+*.epub
+*.pdf
+*.db
+
+/public/pdf-assets/
+
+.tincan/
+__pycache__/

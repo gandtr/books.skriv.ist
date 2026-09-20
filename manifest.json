@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "skrivist.books",
+  "name": "Skrivist Books",
+  "version": "1.0.0",
+  "description": "A local-first EPUB/PDF reader with saved OPDS shelves. No cloud accounts or book uploads.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "omarchy/Books.qml"
+  },
+  "barWidget": {
+    "displayName": "Books",
+    "description": "Open your private reading room",
+    "category": "Applications",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

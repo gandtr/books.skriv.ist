@@ -84,3 +84,14 @@ it('reads standard EPUB navigation DOCTYPE and literal percent paths', async () 
   );
   epub.close();
 });
+it('keeps a readable spine when optional manifest media is external or malformed', async () => {
+  const epub = await Epub.open(
+    epubFile({
+      $manifest:
+        '<item id="remote" href="https://cdn.example/audio.mp3" media-type="audio/mpeg"/><item id="bad" href="audio\\track.mp3" media-type="audio/mpeg"/>',
+    }),
+  );
+  expect(epub.info.sections).toHaveLength(2);
+  expect((await epub.chapter(0)).textContent).toContain('A quiet morning');
+  epub.close();
+});

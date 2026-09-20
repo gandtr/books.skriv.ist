@@ -41,6 +41,7 @@
     history: string[] = [];
   let controller: AbortController | undefined;
   let downloadController: AbortController | undefined;
+  let pendingShelf: Shelf | undefined;
   const size = 24;
   $: entries = feed?.entries.slice(page * size, (page + 1) * size) || [];
   $: next = feed?.links.find((link) => link.rel.split(/\s+/).includes('next'));
@@ -91,9 +92,17 @@
   function connect() {
     history = [];
     const conn = { url, username, password };
-    load(url, conn);
+    const target =
+      pendingShelf &&
+      pendingShelf.connectionUrl === url &&
+      pendingShelf.username === username
+        ? pendingShelf.url
+        : url;
+    pendingShelf = undefined;
+    load(target, conn);
   }
   function savedOpen(shelf: Shelf) {
+    pendingShelf = shelf;
     const conn = savedConnection(shelf.connectionUrl, shelf.username);
     url = shelf.connectionUrl;
     username = shelf.username;

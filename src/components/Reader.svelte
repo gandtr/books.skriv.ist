@@ -15,6 +15,7 @@
   let pdf: PDFDocumentProxy | undefined,
     pdfTask: PDFDocumentLoadingTask | undefined,
     renderTask: RenderTask | undefined;
+  let readable = false;
   let loading = true,
     error = '',
     chapter = book.position.chapter || 0,
@@ -34,7 +35,7 @@
   let sections: { title: string; path: string }[] = [];
   const readerCss = `:host{display:block;height:100%;min-height:0;overflow:hidden}#flow{height:100%;column-fill:auto;column-gap:48px;line-height:1.7;font-family:Georgia,'Times New Roman',serif;color:var(--ink);overflow:visible;overflow-wrap:anywhere;box-sizing:border-box}#flow>*:first-child{margin-top:0}p{margin:0 0 1em}h1,h2,h3,h4{line-height:1.2;break-after:avoid;font-weight:500}h1{font-size:1.9em}h2{font-size:1.45em}img{display:block;max-width:100%;max-height:85%;object-fit:contain;break-inside:avoid;margin:auto}pre{white-space:pre-wrap;font:0.8em/1.5 monospace}table{max-width:100%;font-size:.85em;border-collapse:collapse}td,th{padding:.4em;border:1px solid var(--line)}a{color:var(--accent)}blockquote{margin:1em;padding-left:1em;border-left:2px solid var(--accent)}hr{border:0;border-top:1px solid var(--line)}`;
   function persist() {
-    if (loading || error || !mounted) return;
+    if (loading || !readable || !mounted) return;
     const progress = completed
       ? 1
       : book.format === 'epub'
@@ -71,6 +72,7 @@
     if (!epub) return;
     const request = ++sequence;
     loading = true;
+    readable = false;
     error = '';
     try {
       const fragment = await epub.chapter(index);
@@ -93,6 +95,7 @@
         content.style.transform = `translateX(${-spread * step}px)`;
       }
       loading = false;
+      readable = true;
       persist();
     } catch (e) {
       if (mounted && request === sequence) {
@@ -105,6 +108,7 @@
     if (!pdf) return;
     const request = ++sequence;
     loading = true;
+    readable = false;
     error = '';
     renderTask?.cancel();
     try {
@@ -127,6 +131,7 @@
       if (!mounted || request !== sequence) return;
       page = target;
       loading = false;
+      readable = true;
       persist();
     } catch (e) {
       if (
@@ -176,9 +181,13 @@
   function key(event: KeyboardEvent) {
     if (
       event.target instanceof HTMLInputElement ||
-      event.target instanceof HTMLSelectElement ||
-      event.target instanceof HTMLButtonElement ||
-      event.target instanceof HTMLAnchorElement
+      event.target instanceof HTMLSelectElement
+    )
+      return;
+    if (
+      event.key === ' ' &&
+      (event.target instanceof HTMLButtonElement ||
+        event.target instanceof HTMLAnchorElement)
     )
       return;
     if (event.key === 'Escape') {

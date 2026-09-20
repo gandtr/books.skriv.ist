@@ -95,6 +95,7 @@ export async function addBook(
     if (req.result) {
       result = { ...req.result, remote: book.remote || req.result.remote };
       tx.objectStore('books').put(result);
+      if (cover) tx.objectStore('covers').put(cover, book.id);
       const stored = tx.objectStore('files').get(book.id);
       stored.onsuccess = () => {
         if (!stored.result) tx.objectStore('files').put(file, book.id);

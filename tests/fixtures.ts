@@ -16,6 +16,13 @@ export function epubFile(
       '<html xmlns="http://www.w3.org/1999/xhtml"><body><nav><ol><li><a href="one.xhtml">Morning</a></li><li><a href="two.xhtml">Evening</a></li></ol></nav></body></html>',
     ...extra,
   };
+  if (extra['$manifest']) {
+    files['OPS/package.opf'] = files['OPS/package.opf'].replace(
+      '</manifest>',
+      extra['$manifest'] + '</manifest>',
+    );
+    delete files['$manifest'];
+  }
   const archive = zipSync(
     Object.fromEntries(
       Object.entries(files).map(([path, text]) => [path, strToU8(text)]),

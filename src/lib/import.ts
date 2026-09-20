@@ -2,6 +2,7 @@ import { Epub, MAX_BOOK } from './epub';
 import {
   addBook,
   getBook,
+  getCover,
   getFile,
   listBooks,
   type Book,
@@ -39,8 +40,18 @@ export async function importBook(
   ).join('');
   const existing = await getBook(id);
   if (existing) {
+    let restoredCover: Blob | undefined;
+    if (format === 'epub' && !(await getCover(id))) {
+      const epub = await Epub.open(new Uint8Array(bytes));
+      restoredCover = epub.info.cover;
+      epub.close();
+    }
     signal?.throwIfAborted();
-    return addBook({ ...existing, remote: remote || existing.remote }, file);
+    return addBook(
+      { ...existing, remote: remote || existing.remote },
+      file,
+      restoredCover,
+    );
   }
   let title = file.name.replace(/\.(epub|pdf)$/i, ''),
     author = '',

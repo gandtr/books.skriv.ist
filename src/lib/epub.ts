@@ -140,16 +140,21 @@ export class Epub {
     );
     if (!packagePath) throw new Error('This EPUB has no reading package.');
     const opf = xml(await this.text(packagePath));
-    const items = new Map(
-      local(opf, 'item').map((item) => [
-        item.getAttribute('id')!,
-        {
+    const items = new Map<
+      string,
+      { path: string; type: string; properties: string }
+    >();
+    for (const item of local(opf, 'item')) {
+      try {
+        items.set(item.getAttribute('id') || '', {
           path: resolvePath(item.getAttribute('href') || '', packagePath),
           type: item.getAttribute('media-type') || '',
           properties: item.getAttribute('properties') || '',
-        },
-      ]),
-    );
+        });
+      } catch {
+        /* Unsupported external media must not prevent reading the local spine. */
+      }
+    }
     const sections = local(opf, 'itemref')
       .filter((item) => item.getAttribute('linear') !== 'no')
       .flatMap((ref) => {

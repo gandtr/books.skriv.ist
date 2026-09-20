@@ -96,3 +96,20 @@ it('repairs a missing file and attaches catalogue identity without resetting pro
   expect(repaired.remote).toEqual(remote);
   expect(await getFile(book.id)).toBeTruthy();
 });
+it('restores missing covers on re-import', async () => {
+  const file = epubFile({
+    $manifest:
+      '<item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/>',
+    'OPS/cover.png': 'synthetic image bytes',
+  });
+  const book = await importBook(file);
+  expect(await getCover(book.id)).toBeTruthy();
+  const d = await db();
+  await new Promise<void>((resolve) => {
+    const tx = d.transaction('covers', 'readwrite');
+    tx.objectStore('covers').delete(book.id);
+    tx.oncomplete = () => resolve();
+  });
+  await importBook(file);
+  expect(await getCover(book.id)).toBeTruthy();
+});

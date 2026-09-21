@@ -6,6 +6,20 @@
     RenderTask,
   } from 'pdfjs-dist';
   import Notes from './Notes.svelte';
+  import {
+    papers,
+    isPaper,
+    paperStyle,
+    pdfPaper,
+    type Paper,
+  } from '../lib/paper';
+  let paper: Paper = 'auto';
+  function changePaper() {
+    try {
+      localStorage.setItem('books-paper', paper);
+    } catch {}
+    if (pdf) showPdf(page);
+  }
   import type { ReadingNote } from '../lib/notes';
   import type { Position } from '../lib/store';
   import { Epub } from '../lib/epub';
@@ -139,7 +153,11 @@
       canvas.height = viewport.height;
       canvas.style.width = `${viewport.width / Math.min(devicePixelRatio, 2)}px`;
       canvas.style.height = `${viewport.height / Math.min(devicePixelRatio, 2)}px`;
-      renderTask = sheet.render({ canvas, viewport });
+      renderTask = sheet.render({
+        canvas,
+        viewport,
+        pageColors: pdfPaper(paper),
+      });
       await renderTask.promise;
       if (!mounted || request !== sequence) return;
       const textViewport = sheet.getViewport({ scale: Math.max(0.2, scale) });
@@ -239,6 +257,10 @@
   }
   let resizeTimer: ReturnType<typeof setTimeout>;
   onMount(() => {
+    try {
+      const saved = localStorage.getItem('books-paper');
+      if (isPaper(saved)) paper = saved;
+    } catch {}
     font = Math.min(
       30,
       Math.max(14, Number(localStorage.getItem('books-font')) || 18),
@@ -375,12 +397,28 @@
       : page === total;
 </script>
 
-<div class="reader-shell" role="region" aria-label={`Reading ${book.title}`}>
+<div
+  class="reader-shell"
+  style={paperStyle(paper)}
+  role="region"
+  aria-label={`Reading ${book.title}`}
+>
   <header class="reader-toolbar">
     <button class="quiet" onclick={close}>← Library</button>
     <div class="reader-book">
       <strong>{book.title}</strong><span>{book.author}</span>
     </div>
+    <label class="paper-control"
+      >Paper<select
+        aria-label="Paper color"
+        bind:value={paper}
+        onchange={changePaper}
+        disabled={loading}
+        >{#each Object.entries(papers) as [value, option]}<option {value}
+            >{option.label}</option
+          >{/each}</select
+      ></label
+    >
     {#if book.format === 'epub'}<button
         class="secondary"
         onclick={() => (toc = !toc)}>Contents</button

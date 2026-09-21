@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "skrivist.books",
   "name": "Skrivist Books",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A local-first EPUB/PDF reader with saved OPDS shelves. No cloud accounts or book uploads.",
   "kinds": [
     "bar-widget"

@@ -115,3 +115,33 @@ it('location links round-trip and reject malformed coordinates', async () => {
   ).toEqual({ id: book.id });
   expect(parseReadingRoute('#read=../../private')).toBeUndefined();
 });
+
+it('encodes Obsidian spaces as %20 while preserving literal plus signs and Unicode', async () => {
+  const book = {
+    ...(await importBook(epubFile())),
+    title: "Reader's Book + 日本語",
+  };
+  const n = {
+    ...note(book.id),
+    text: 'Two words + another line\nNext paragraph.',
+  };
+  const uri = obsidianLink(book, n, 'My vault + 日本語', 'Reading notes/Books');
+  // Obsidian uses URI decoding, which deliberately does not turn + into spaces.
+  const values = Object.fromEntries(
+    uri
+      .split('?')[1]
+      .split('&')
+      .map((pair) => {
+        const [key, value] = pair.split('=');
+        return [key, decodeURIComponent(value)];
+      }),
+  );
+  expect(uri).not.toContain('+');
+  expect(uri).toContain('%20');
+  expect(uri).toContain('%2B');
+  expect(values.vault).toBe('My vault + 日本語');
+  expect(values.file).toBe(
+    `Reading notes/Books/Reader's Book + 日本語 - ${n.id}.md`,
+  );
+  expect(values.content).toContain(n.text);
+});

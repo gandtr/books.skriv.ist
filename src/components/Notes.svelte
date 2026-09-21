@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import { ankiCsv } from '../lib/anki';
   import type { Book } from '../lib/store';
   import {
     listNotes,
@@ -101,11 +102,15 @@
       if (!vault.trim()) settingsOpen = true;
     }
   }
-  function download(note?: ReadingNote) {
-    const body = note
-      ? noteMarkdown(book, note)
-      : notes.map((n) => noteMarkdown(book, n)).join('\n---\n\n');
-    const blob = new Blob([body], { type: 'text/markdown;charset=utf-8' });
+  function download(note?: ReadingNote, anki = false) {
+    const body = anki
+      ? ankiCsv(book, note ? [note] : notes)
+      : note
+        ? noteMarkdown(book, note)
+        : notes.map((n) => noteMarkdown(book, n)).join('\n---\n\n');
+    const blob = new Blob([body], {
+      type: anki ? 'text/csv;charset=utf-8' : 'text/markdown;charset=utf-8',
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -113,7 +118,11 @@
       ? noteFile(book, note, '')
       : book.title.replace(/[^\p{L}\p{N} _-]/gu, '').slice(0, 70) +
         ' - notes.md';
+    if (anki) a.download = a.download.replace(/\.md$/, ' - Anki.csv');
     a.click();
+    if (anki)
+      notice =
+        'Anki file downloaded. In Anki, choose File → Import, select this CSV, and use a two-field Basic note type (Front / Back).';
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   async function remove(note: ReadingNote) {
@@ -242,6 +251,8 @@
         }}>Write a note here</button
       >{#if notes.length}<button class="secondary" onclick={() => download()}
           >Download all Markdown</button
+        ><button class="secondary" onclick={() => download(undefined, true)}
+          >Export all to Anki</button
         >{/if}
     </div>
     {#if !notes.length}<p class="empty-note">
@@ -267,14 +278,19 @@
               >Open in Obsidian</button
             ><button class="quiet" onclick={() => download(note)}
               >Markdown ↓</button
+            ><button class="quiet" onclick={() => download(note, true)}
+              >Anki ↓</button
             ><button class="quiet" onclick={() => remove(note)}>Delete</button>
           </div>
         </article>{/each}
     </div>
   {/if}
   <p class="small-note">
-    Notes stay in this browser until you export them. Obsidian needs to be
-    installed. Scanned PDFs without text support location notes, but cannot
-    provide selectable quotations.
+    Anki exports put the passage on the front and your note with its source on
+    the back. Without a passage, the front asks what you noted at that location.
+    Import the CSV in Anki, then edit cards there to suit your study. Notes stay
+    in this browser until you export them. Obsidian needs to be installed.
+    Scanned PDFs without text support location notes, but cannot provide
+    selectable quotations.
   </p>
 </dialog>

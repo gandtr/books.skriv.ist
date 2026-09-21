@@ -7,7 +7,7 @@ A static SPA that runs in your browser. No account, backend, cloud library, anal
 ## Read
 
 - Add EPUB or PDF files, or explicitly select a folder. Files stay in IndexedDB on your device.
-- Paginated EPUB reading, contents navigation, text size, light/dark themes, and keyboard navigation.
+- Paginated EPUB reading, contents navigation, text size, light/dark themes, and keyboard navigation. Reader paper choices: Match theme, White, Cream, Sepia, Sage, and Night. The paper choice stays on this device and applies to EPUB text and PDF foreground/background rendering; Match theme keeps original PDF colors.
 - PDF rendering code runs on demand. The initial UI is small; offline assets download in the background.
 - Reading positions, progress, read/unread filters, and 24-book library pages.
 - Install as a PWA. Wait for the “Ready to read offline” notice on the first visit. The app and PDF fonts/codecs (about 6 MB total) are then cached for offline reading.
@@ -19,9 +19,15 @@ Use arrow keys or Page Up/Down to turn pages and Escape to return to the shelf. 
 
 Select text in an EPUB or text-based PDF, then choose **Add note**. Add your own thoughts, or save a quotation by itself. You can also add a note without a selection at the current chapter/spread or PDF page. **Notes** lists the book’s annotations, lets you edit them, and jumps back to their locations. Scanned PDFs without a text layer support page notes but not text selection; OCR is not included.
 
-Notes are stored locally in IndexedDB. In **Obsidian destination**, enter your vault name and a folder within it (default `Reading`). **Save & open Obsidian** saves the note locally and passes Markdown to the installed Obsidian app using its built-in URI handler. No community plugin, API key, account, vault scanning, or book upload is needed. The browser may ask to open Obsidian. It cannot confirm that Obsidian completed the write.
+Notes are stored locally in IndexedDB. In **Obsidian destination**, enter your vault name and a folder within it (default `Reading`). **Save & open Obsidian** saves the note locally and passes Markdown to the installed Obsidian app using its built-in URI handler. No community plugin, API key, account, vault scanning, or book upload is needed. Spaces in Obsidian links use `%20`, preserving spaces in filenames and note text. Notes exported by v1.1.0 may already contain literal `+` characters: rename or edit those copies in Obsidian, or export the saved local note again. The app does not modify existing vault files. The browser may ask to open Obsidian. It cannot confirm that Obsidian completed the write.
 
 Exports include title, author, quotation, your note, reading location, and a link back to that location. The same book file must be present in the browser at the linked reader origin. The EPUB location is a chapter and proportional spread position, so a different font size or screen width may change the visible text around it. Export is one-way; it never requests overwriting existing Obsidian files. To edit an exported copy, use Obsidian, or export another copy. Large notes that exceed app-link limits can be downloaded as Markdown; **Download all Markdown** exports a book’s notes together. Keep exported backups: removing a book deletes its local notes too.
+
+## Anki
+
+In **Notes**, choose **Anki ↓** for one saved note or **Export all to Anki** for the book. This downloads a UTF-8 CSV; nothing is sent to a server or AnkiWeb. In desktop Anki, choose **File → Import**, select the CSV and a standard two-field **Basic** note type, map Front/Back if needed, and choose your deck. Anki 2.1.54+ reads the included separator, HTML, field, and tag headers automatically.
+
+The quotation becomes the front; your note, title, author, location, and return link become the back. A note without a quotation uses a question about that reading location as its front. Edit the cards in Anki to refine your questions. Text is escaped before HTML formatting, so imported book text and notes cannot load remote images or inject markup. Cards get the `skrivist-books` tag. Anki matches duplicates by the first field: review its duplicate settings when importing repeated quotations or re-exporting. This is a file export, not live synchronization.
 
 ## OPDS
 

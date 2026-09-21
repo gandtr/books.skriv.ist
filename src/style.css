@@ -1332,3 +1332,21 @@ svg {
     font-size: 25px;
   }
 }
+
+.paper-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.paper-control select {
+  width: auto;
+  min-width: 105px;
+  padding: 7px 9px;
+  font-size: 11px;
+  color: var(--ink);
+  background: var(--reader);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}

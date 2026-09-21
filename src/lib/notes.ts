@@ -119,12 +119,17 @@ export function obsidianLink(
   origin = location.origin,
 ) {
   if (!vault.trim()) throw new Error('Enter the Obsidian vault name first.');
-  const params = new URLSearchParams({
+  const params = {
     vault: vault.trim(),
     file: noteFile(book, note, folder),
     content: noteMarkdown(book, note, origin),
-  });
-  const url = 'obsidian://new?' + params;
+  };
+  // Obsidian decodes URI components, not form data: spaces must be %20.
+  const url =
+    'obsidian://new?' +
+    Object.entries(params)
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&');
   if (url.length > 20000)
     throw new Error(
       'This note is too long for an app link. Download Markdown and add it to Obsidian instead.',

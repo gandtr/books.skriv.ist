@@ -29,6 +29,16 @@ In **Notes**, choose **Anki ↓** for one saved note or **Export all to Anki** f
 
 The quotation becomes the front; your note, title, author, location, and return link become the back. A note without a quotation uses a question about that reading location as its front. Edit the cards in Anki to refine your questions. Text is escaped before HTML formatting, so imported book text and notes cannot load remote images or inject markup. Cards get the `skrivist-books` tag. Anki matches duplicates by the first field: review its duplicate settings when importing repeated quotations or re-exporting. This is a file export, not live synchronization.
 
+## Calibre database integration
+
+Open **Calibre → Choose library folder** and select the library root containing `metadata.db`. Close Calibre first so its database is fully saved. The reader opens a **read-only, in-memory SQLite snapshot** in a background worker. Nothing is uploaded or written back, and no library is connected automatically.
+
+Browse 24 books per page. Search titles, authors, series, or tags and filter by EPUB/PDF. **Read EPUB / Read PDF** reads only that file and saves it in this browser for offline reading. Calibre's title and author are used when adding a new book. A previously imported identical file retains its notes and reading progress. Other formats are listed; convert them in Calibre before reading. Calibre's own annotations, custom columns, and reading positions are not synchronized.
+
+On browsers supporting the File System Access API, folder access is read-only and files are resolved on demand without recursively scanning the library. **Use compatible folder picker** works in other browsers; it enumerates filenames but reads book contents only when you choose a book. Both methods require explicit folder selection. Metadata and folder references remain in this page's memory and are released when you reload or disconnect; already opened books remain in your browser library.
+
+Use **Refresh library** after changing metadata in Calibre (close Calibre again first). The compatible picker asks you to select the folder again for a fresh snapshot. Database snapshots are limited to 64 MB; pending SQLite WAL/journal files are rejected to avoid displaying an incomplete snapshot. Path traversal outside the selected root is rejected. A missing or moved book reports an error rather than searching other folders. For larger or remotely hosted libraries, use Calibre's OPDS feed through **Catalogues** instead.
+
 ## OPDS
 
 Add your own OPDS 1 (Atom) or OPDS 2 catalogue in **Catalogues**. Save connections and individual shelves. Browse 24 entries at a time; server pagination is followed only when needed. Book files download only when you press **Read book**, then remain available locally.

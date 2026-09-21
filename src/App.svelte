@@ -3,6 +3,7 @@
   import { registerSW } from 'virtual:pwa-register';
   import BookCard from './components/BookCard.svelte';
   import Catalogue from './components/Catalogue.svelte';
+  import Calibre from './components/Calibre.svelte';
   import Reader from './components/Reader.svelte';
   import { parseReadingRoute } from './lib/notes';
   let initialPosition: import('./lib/store').Position | undefined;
@@ -249,6 +250,9 @@
         ><button
           class:active={view === 'catalogues'}
           onclick={() => (view = 'catalogues')}>Catalogues</button
+        ><button
+          class:active={view === 'calibre'}
+          onclick={() => (view = 'calibre')}>Calibre</button
         >
       </nav>
       <div class="header-actions">
@@ -324,7 +328,10 @@
             >
           </div>
         </section>{/if}
-      {#if view === 'catalogues'}<Catalogue
+      {#if view === 'calibre'}<Calibre
+          onread={read}
+          onadded={refresh}
+        />{:else if view === 'catalogues'}<Catalogue
           onread={read}
           onadded={refresh}
         />{:else}

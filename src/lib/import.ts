@@ -12,6 +12,7 @@ export async function importBook(
   file: File,
   remote?: Remote,
   signal?: AbortSignal,
+  metadata?: { title: string; author: string },
 ): Promise<Book> {
   signal?.throwIfAborted();
   const format = file.name.toLowerCase().endsWith('.epub')
@@ -62,6 +63,10 @@ export async function importBook(
     epub.close();
   } else if (new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-')
     throw new Error('This file is not a valid PDF.');
+  if (metadata) {
+    title = metadata.title;
+    author = metadata.author;
+  }
   signal?.throwIfAborted();
   return addBook(
     {

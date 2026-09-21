@@ -31,13 +31,20 @@ export interface Shelf {
 let opening: Promise<IDBDatabase> | undefined;
 export function db(): Promise<IDBDatabase> {
   return (opening ??= new Promise((resolve, reject) => {
-    const req = indexedDB.open('skrivist-books', 1);
+    const req = indexedDB.open('skrivist-books', 2);
     req.onupgradeneeded = () => {
       const db = req.result;
-      db.createObjectStore('books', { keyPath: 'id' });
-      db.createObjectStore('files');
-      db.createObjectStore('covers');
-      db.createObjectStore('shelves', { keyPath: 'url' });
+      if (!db.objectStoreNames.contains('books')) {
+        db.createObjectStore('books', { keyPath: 'id' });
+        db.createObjectStore('files');
+        db.createObjectStore('covers');
+        db.createObjectStore('shelves', { keyPath: 'url' });
+      }
+      if (!db.objectStoreNames.contains('notes'))
+        db.createObjectStore('notes', { keyPath: 'id' }).createIndex(
+          'bookId',
+          'bookId',
+        );
     };
     req.onsuccess = () => {
       req.result.onversionchange = () => {
@@ -125,8 +132,19 @@ export async function updateBook(
 }
 export async function deleteBook(id: string) {
   const d = await db(),
-    tx = d.transaction(['books', 'files', 'covers'], 'readwrite'),
+    tx = d.transaction(['books', 'files', 'covers', 'notes'], 'readwrite'),
     finished = done(tx);
+  const notes = tx
+    .objectStore('notes')
+    .index('bookId')
+    .openKeyCursor(IDBKeyRange.only(id));
+  notes.onsuccess = () => {
+    const cursor = notes.result;
+    if (cursor) {
+      tx.objectStore('notes').delete(cursor.primaryKey);
+      cursor.continue();
+    }
+  };
   for (const name of ['books', 'files', 'covers'])
     tx.objectStore(name).delete(id);
   await finished;

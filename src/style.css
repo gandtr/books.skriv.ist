@@ -1179,3 +1179,156 @@ svg {
     scroll-behavior: auto !important;
   }
 }
+/* Reading notebook and selectable PDF text. */
+.notes-dialog {
+  width: min(680px, calc(100vw - 32px));
+  max-height: 90dvh;
+  box-sizing: border-box;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 20px 90px #0004;
+}
+.notes-dialog::backdrop {
+  background: #0006;
+  backdrop-filter: blur(3px);
+}
+.notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+}
+.notes-header h2 {
+  margin: 8px 0;
+  font:
+    30px Georgia,
+    serif;
+}
+.notes-dialog label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  font-size: 14px;
+}
+.notes-dialog textarea,
+.notes-dialog input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+.note-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 18px 0;
+}
+.note-location {
+  font-size: 13px;
+  color: var(--muted);
+}
+.notes-list article {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.notes-list blockquote {
+  margin: 14px 0;
+  padding: 8px 14px;
+  border-left: 3px solid var(--accent);
+  font:
+    17px/1.65 Georgia,
+    serif;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.note-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.obsidian-settings {
+  padding: 16px 0;
+  border-block: 1px solid var(--line);
+  margin: 20px 0;
+}
+.obsidian-settings summary {
+  cursor: pointer;
+  font-size: 14px;
+}
+.reader-toolbar {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pdf-frame {
+  position: relative;
+  flex: none;
+}
+.pdf-frame canvas {
+  display: block;
+}
+.pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  transform-origin: 0 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.pdf-text-layer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+  user-select: text;
+}
+.pdf-text-layer > :not(.markedContent),
+.pdf-text-layer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x))
+    scale(var(--min-font-size-inv));
+}
+.pdf-text-layer .markedContent {
+  display: contents;
+}
+.pdf-text-layer ::selection {
+  background: #5a8ad166;
+  color: transparent;
+}
+.reading-page.pdf {
+  overflow: auto;
+}
+@media (max-width: 600px) {
+  .notes-dialog {
+    padding: 20px;
+  }
+  .reader-toolbar .reader-book {
+    flex: 1;
+    min-width: 100px;
+  }
+  .reader-toolbar {
+    padding: 10px;
+  }
+  .notes-header h2 {
+    font-size: 25px;
+  }
+}

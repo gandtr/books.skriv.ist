@@ -5,9 +5,18 @@
     PDFDocumentLoadingTask,
     RenderTask,
   } from 'pdfjs-dist';
+  import Notes from './Notes.svelte';
+  import type { ReadingNote } from '../lib/notes';
+  import type { Position } from '../lib/store';
   import { Epub } from '../lib/epub';
   import { getFile, updateBook, type Book } from '../lib/store';
   export let book: Book;
+  export let initialPosition: Position | undefined = undefined;
+  let notesPanel: Notes;
+  let selectedQuote = '';
+  let pdfText: HTMLDivElement, pdfFrame: HTMLDivElement;
+  let textLayer: import('pdfjs-dist').TextLayer | undefined;
+  let PdfTextLayer: typeof import('pdfjs-dist').TextLayer;
   export let onclose: () => void;
   export let onchanged: () => void;
   let host: HTMLDivElement, canvas: HTMLCanvasElement;
@@ -18,9 +27,9 @@
   let readable = false;
   let loading = true,
     error = '',
-    chapter = book.position.chapter || 0,
-    fraction = book.position.fraction || 0,
-    page = book.position.page || 1,
+    chapter = (initialPosition || book.position).chapter || 0,
+    fraction = (initialPosition || book.position).fraction || 0,
+    page = (initialPosition || book.position).page || 1,
     total = 0;
   let spread = 0,
     spreads = 1,
@@ -70,6 +79,7 @@
   }
   async function showChapter(index: number, position = 0, last = false) {
     if (!epub) return;
+    selectedQuote = '';
     const request = ++sequence;
     loading = true;
     readable = false;
@@ -106,11 +116,14 @@
   }
   async function showPdf(target: number) {
     if (!pdf) return;
+    selectedQuote = '';
     const request = ++sequence;
     loading = true;
     readable = false;
     error = '';
     renderTask?.cancel();
+    textLayer?.cancel();
+    pdfText.replaceChildren();
     try {
       const sheet = await pdf.getPage(target);
       if (!mounted || request !== sequence) return;
@@ -129,6 +142,24 @@
       renderTask = sheet.render({ canvas, viewport });
       await renderTask.promise;
       if (!mounted || request !== sequence) return;
+      const textViewport = sheet.getViewport({ scale: Math.max(0.2, scale) });
+      pdfFrame.style.width = `${textViewport.width}px`;
+      pdfFrame.style.height = `${textViewport.height}px`;
+      pdfText.style.setProperty(
+        '--total-scale-factor',
+        String(textViewport.scale),
+      );
+      textLayer = new PdfTextLayer({
+        textContentSource: sheet.streamTextContent(),
+        container: pdfText,
+        viewport: textViewport,
+      });
+      try {
+        await textLayer.render();
+      } catch {
+        if (mounted && request === sequence) pdfText.replaceChildren();
+      }
+      if (!mounted || request !== sequence) return;
       page = target;
       loading = false;
       readable = true;
@@ -145,6 +176,7 @@
     }
   }
   function turn(delta: number) {
+    selectedQuote = '';
     if (loading) return;
     if (book.format === 'pdf') {
       const target = page + delta;
@@ -179,6 +211,7 @@
     onclose();
   }
   function key(event: KeyboardEvent) {
+    if (document.querySelector('dialog[open]')) return;
     if (
       event.target instanceof HTMLInputElement ||
       event.target instanceof HTMLSelectElement
@@ -243,6 +276,7 @@
           await showChapter(Math.min(chapter, total - 1), fraction);
         } else {
           const pdfjs = await import('pdfjs-dist');
+          PdfTextLayer = pdfjs.TextLayer;
           const worker =
             await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
           pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
@@ -277,10 +311,12 @@
         loading = false;
       }
     })();
+    document.addEventListener('selectionchange', captureSelection);
     window.addEventListener('keydown', key);
     return () => {
       observer?.disconnect();
       window.removeEventListener('keydown', key);
+      document.removeEventListener('selectionchange', captureSelection);
     };
   });
   onDestroy(() => {
@@ -289,8 +325,43 @@
     clearTimeout(resizeTimer);
     epub?.close();
     renderTask?.cancel();
+    textLayer?.cancel();
     void pdfTask?.destroy().catch(() => {});
   });
+  function captureSelection() {
+    const selection =
+      (
+        root as ShadowRoot & { getSelection?: () => Selection | null }
+      )?.getSelection?.() || window.getSelection();
+    if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    const area = book.format === 'epub' ? content : pdfText;
+    if (
+      area?.contains(range.startContainer) &&
+      area.contains(range.endContainer)
+    )
+      selectedQuote = selection.toString().trim();
+  }
+  function captureNote() {
+    captureSelection();
+    return {
+      quote: selectedQuote,
+      position: { chapter, fraction, page },
+      section: sectionTitle,
+    };
+  }
+  function jumpNote(note: ReadingNote) {
+    goToPosition(note.position);
+  }
+  export function goToPosition(position: Position) {
+    if (loading) return;
+    if (epub)
+      showChapter(
+        Math.min(Math.max(0, position.chapter), total - 1),
+        position.fraction,
+      );
+    else if (pdf) showPdf(Math.min(Math.max(1, position.page), total));
+  }
   function fontChange(delta: number) {
     font = Math.min(30, Math.max(14, font + delta));
     localStorage.setItem('books-font', String(font));
@@ -326,6 +397,13 @@
       onclick={() => finish().catch((e) => (error = e.message))}
       >{completed ? '✓ Read' : 'Mark read'}</button
     >
+    <button
+      class="secondary"
+      disabled={loading || !readable}
+      onpointerdown={captureSelection}
+      onclick={() => notesPanel.open(true)}>Add note</button
+    >
+    <button class="quiet" onclick={() => notesPanel.open()}>Notes</button>
   </header>
   {#if error}<div class="message error reader-message" role="alert">
       {error}<button
@@ -363,10 +441,11 @@
       class:pdf={book.format === 'pdf'}
       bind:this={host}
     >
-      {#if book.format === 'pdf'}<canvas
-          bind:this={canvas}
-          aria-label={`Page ${page} of ${total}`}
-        ></canvas>{/if}
+      {#if book.format === 'pdf'}<div class="pdf-frame" bind:this={pdfFrame}>
+          <canvas bind:this={canvas} aria-label={`Page ${page} of ${total}`}
+          ></canvas>
+          <div class="pdf-text-layer" bind:this={pdfText}></div>
+        </div>{/if}
     </div>
     <button
       class="page-turn next"
@@ -389,3 +468,5 @@
       >{/if}
   </footer>
 </div>
+
+<Notes bind:this={notesPanel} {book} capture={captureNote} jump={jumpNote} />

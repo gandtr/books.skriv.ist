@@ -15,6 +15,14 @@ A static SPA that runs in your browser. No account, backend, cloud library, anal
 
 Use arrow keys or Page Up/Down to turn pages and Escape to return to the shelf. Mark a book read when finished; marking it unread resets its reading position. File imports are limited to 128 MB each; encrypted/DRM-protected books are not supported. EPUB presentation is adapted for readable, safe text rather than reproducing publisher layouts or scripts.
 
+## Notes and Obsidian
+
+Select text in an EPUB or text-based PDF, then choose **Add note**. Add your own thoughts, or save a quotation by itself. You can also add a note without a selection at the current chapter/spread or PDF page. **Notes** lists the book’s annotations, lets you edit them, and jumps back to their locations. Scanned PDFs without a text layer support page notes but not text selection; OCR is not included.
+
+Notes are stored locally in IndexedDB. In **Obsidian destination**, enter your vault name and a folder within it (default `Reading`). **Save & open Obsidian** saves the note locally and passes Markdown to the installed Obsidian app using its built-in URI handler. No community plugin, API key, account, vault scanning, or book upload is needed. The browser may ask to open Obsidian. It cannot confirm that Obsidian completed the write.
+
+Exports include title, author, quotation, your note, reading location, and a link back to that location. The same book file must be present in the browser at the linked reader origin. The EPUB location is a chapter and proportional spread position, so a different font size or screen width may change the visible text around it. Export is one-way; it never requests overwriting existing Obsidian files. To edit an exported copy, use Obsidian, or export another copy. Large notes that exceed app-link limits can be downloaded as Markdown; **Download all Markdown** exports a book’s notes together. Keep exported backups: removing a book deletes its local notes too.
+
 ## OPDS
 
 Add your own OPDS 1 (Atom) or OPDS 2 catalogue in **Catalogues**. Save connections and individual shelves. Browse 24 entries at a time; server pagination is followed only when needed. Book files download only when you press **Read book**, then remain available locally.

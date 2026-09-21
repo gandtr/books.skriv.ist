@@ -4,6 +4,9 @@
   import BookCard from './components/BookCard.svelte';
   import Catalogue from './components/Catalogue.svelte';
   import Reader from './components/Reader.svelte';
+  import { parseReadingRoute } from './lib/notes';
+  let initialPosition: import('./lib/store').Position | undefined;
+  let reader: Reader;
   import {
     listBooks,
     updateBook,
@@ -77,6 +80,7 @@
     applyTheme();
   }
   async function read(book: Book) {
+    initialPosition = undefined;
     active = book;
     location.hash = `read=${book.id}`;
   }
@@ -85,9 +89,14 @@
     history.replaceState(null, '', location.pathname + location.search);
   }
   async function route() {
-    const match = /^#read=([a-f0-9]{64})$/.exec(location.hash);
+    const match = parseReadingRoute(location.hash);
     if (match) {
-      active = await getBook(match[1]);
+      if (active?.id === match.id && reader) {
+        if (match.position) reader.goToPosition(match.position);
+        return;
+      }
+      initialPosition = match.position;
+      active = await getBook(match.id);
       if (!active) {
         error = 'That book is not stored on this device.';
         history.replaceState(null, '', location.pathname);
@@ -177,7 +186,7 @@
   async function remove(book: Book) {
     if (
       !confirm(
-        `Remove “${book.title}” and its reading position from this device? Your original file is unchanged.`,
+        `Remove “${book.title}” and its local notes and reading position from this device? Your original file is unchanged.`,
       )
     )
       return;
@@ -210,6 +219,8 @@
   ></svelte:head
 >
 {#if active}{#key active.id}<Reader
+      bind:this={reader}
+      {initialPosition}
       book={active}
       onclose={close}
       onchanged={refresh}

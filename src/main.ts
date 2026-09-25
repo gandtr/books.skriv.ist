@@ -1,4 +1,7 @@
 import { mount } from 'svelte';
 import App from './App.svelte';
 import './style.css';
-mount(App, { target: document.getElementById('app')! });
+const target = document.getElementById('app')!;
+// Drop the static crawler intro from index.html; mount() appends, not replaces.
+target.replaceChildren();
+mount(App, { target });

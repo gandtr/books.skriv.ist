@@ -8,11 +8,83 @@
       name="description"
       content="A quiet home for your books. Read EPUB and PDF, browse OPDS catalogues, and keep everything on your device. No account. No cloud storage."
     />
+    <link rel="canonical" href="https://books.skriv.ist/" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <title>Skrivist Books — a quiet place to read</title>
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Skrivist" />
+    <meta property="og:url" content="https://books.skriv.ist/" />
+    <meta
+      property="og:title"
+      content="Skrivist Books — a quiet place to read"
+    />
+    <meta
+      property="og:description"
+      content="A quiet home for your books. Read EPUB and PDF, browse OPDS catalogues, and keep everything on your device. No account. No cloud storage."
+    />
+    <meta property="og:image" content="https://skriv.ist/media/poster-en.jpg" />
+    <meta property="og:image:width" content="1920" />
+    <meta property="og:image:height" content="1080" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Skrivist Books — a quiet place to read"
+    />
+    <meta
+      name="twitter:description"
+      content="A quiet home for your books. Read EPUB and PDF, browse OPDS catalogues, and keep everything on your device. No account. No cloud storage."
+    />
+    <meta
+      name="twitter:image"
+      content="https://skriv.ist/media/poster-en.jpg"
+    />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Skrivist Books",
+        "url": "https://books.skriv.ist/",
+        "description": "A free EPUB and PDF reader that runs in your browser. Browse OPDS catalogues and your Calibre library; books stay on your device. No account.",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Web",
+        "browserRequirements": "Requires JavaScript",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "publisher": {
+          "@type": "Organization",
+          "name": "Gand",
+          "url": "https://gand.tr"
+        }
+      }
+    </script>
+    <!-- Cloudflare Web Analytics -->
+    <script
+      defer
+      src="https://static.cloudflareinsights.com/beacon.min.js"
+      data-cf-beacon='{"token": "214aa5c2a6884c5ba5542bf4b1be6054"}'
+    ></script>
+    <!-- End Cloudflare Web Analytics -->
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <!-- Static intro for crawlers and no-JS visitors; src/main.ts clears it before mounting. -->
+      <main class="static-intro">
+        <h1>Skrivist Books</h1>
+        <p>
+          Skrivist Books is a free EPUB and PDF reader that runs in your
+          browser. Add books from your device or a folder, browse your own OPDS
+          catalogues, or open a local Calibre library read-only. Your books,
+          notes and reading progress stay on this device: there is no account
+          and nothing is uploaded. Install it as an app to read offline.
+        </p>
+        <p>
+          Part of <a href="https://skriv.ist/">Skrivist</a>. Reading comics? Try
+          <a href="https://comics.skriv.ist/">Skrivist Comics</a>. Skrivist
+          Cloud, coming soon, adds sync across devices and text-to-speech.
+        </p>
+        <noscript><p>Skrivist Books needs JavaScript to run.</p></noscript>
+      </main>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

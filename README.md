@@ -2,7 +2,7 @@
 
 A quiet, lightweight ebook reader. **[Open books.skriv.ist](https://books.skriv.ist)**
 
-A static SPA that runs in your browser. No account, backend, cloud library, analytics, or uploads. Separate from app.skriv.ist. Every installation starts empty; no personal books, folders, credentials, or server configuration are bundled.
+A static SPA that runs in your browser. No account, backend, cloud library, or uploads; page visits are counted with cookie-free Cloudflare Web Analytics. Separate from app.skriv.ist. Every installation starts empty; no personal books, folders, credentials, or server configuration are bundled.
 
 ## Read
 

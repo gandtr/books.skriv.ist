@@ -300,8 +300,8 @@
           <h2>Just you and your books.</h2>
           <p>
             Skrivist Books reads EPUB and PDF files on your device. No account,
-            cloud library, analytics, or uploads. It is separate from
-            app.skriv.ist.
+            cloud library, or uploads. It is separate from app.skriv.ist. Page
+            visits are counted with cookie-free Cloudflare Web Analytics.
           </p>
           <p>
             {storage}. Browser storage can be cleared or evicted, so keep your
@@ -469,6 +469,8 @@
         href="https://comics.skriv.ist"
         target="_blank"
         rel="noreferrer">More of a comics person? ↗</a
+      ><a href="https://skriv.ist/" target="_blank" rel="noreferrer"
+        >skriv.ist · Skrivist Cloud coming soon ↗</a
       >
     </footer>
   </div>

@@ -102,6 +102,31 @@ it('quotes imported text literally rather than loading embedded Markdown or HTML
   expect(markdown).toContain('\\!\\[beacon\\]');
   expect(markdown).not.toContain('<img');
 });
+it('neutralises Obsidian-only syntax in quoted text so the return link survives', async () => {
+  const book = {
+    ...(await importBook(epubFile())),
+    title: 'Cost: 50% == $5 ^x',
+  };
+  const markdown = noteMarkdown(
+    book,
+    {
+      ...note(book.id),
+      quote: 'A %%hidden comment and ==highlight== with ^block-id and $x^2$',
+    },
+    'https://books.skriv.ist',
+  );
+  const [title] = markdown.split('\n');
+  const quote = markdown.split('\n').find((l) => l.startsWith('> '))!;
+  for (const line of [title, quote]) {
+    expect(line).not.toMatch(/%|==|\^|\$/);
+  }
+  expect(quote).toContain('&#37;&#37;hidden');
+  expect(quote).toContain('&#61;&#61;highlight&#61;&#61;');
+  expect(quote).toContain('&#94;block\\-id');
+  expect(quote).toContain('&#36;x&#94;2&#36;');
+  expect(title).toBe('# Cost: 50&#37; &#61;&#61; &#36;5 &#94;x');
+  expect(markdown).toContain('[Return to this location](');
+});
 it('location links round-trip and reject malformed coordinates', async () => {
   const book = await importBook(epubFile());
   const n = note(book.id);

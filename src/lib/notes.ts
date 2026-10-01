@@ -78,11 +78,18 @@ export function readingLink(
   return `${origin}/#${params}`;
 }
 function plainMarkdown(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/[\\`*_{}[\]()#+.!|~-]/g, '\\$&');
+  return (
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/[\\`*_{}[\]()#+.!|~-]/g, '\\$&')
+      // Obsidian syntax that backslashes do not reliably escape: %% comments
+      // (which would hide the rest of the note, return link included),
+      // ==highlights==, ^block ids and $math$. Entities always render
+      // literally. Last, so the escape above cannot touch the entities' `#`.
+      .replace(/[%=^$]/g, (c) => `&#${c.charCodeAt(0)};`)
+  );
 }
 export function noteMarkdown(
   book: Book,

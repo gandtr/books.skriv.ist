@@ -30,6 +30,11 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,mjs,css,html,svg,png,bcmap,ttf,otf,pfb,wasm}'],
+        // QuickJS is pdf.js's scripting sandbox, loaded only by
+        // pdf.sandbox.mjs, which this app never imports (no enableScripting).
+        // The *_nowasm_fallback.js decoders stay: pdf.js loads them whenever
+        // its wasm cannot instantiate (e.g. iOS Lockdown Mode).
+        globIgnores: ['**/pdf-assets/wasm/quickjs-eval.*'],
         maximumFileSizeToCacheInBytes: 2000000,
         navigateFallback: '/index.html',
         runtimeCaching: [

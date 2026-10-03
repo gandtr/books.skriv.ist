@@ -819,6 +819,8 @@ svg {
   min-width: 0;
   height: 100%;
   overflow: hidden;
+  /* Horizontal swipes turn pages (Reader.svelte); keep vertical pan and zoom. */
+  touch-action: pan-y pinch-zoom;
   max-width: 1200px;
   margin: auto;
   display: block;

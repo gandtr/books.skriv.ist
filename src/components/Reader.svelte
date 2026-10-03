@@ -23,6 +23,7 @@
   import type { ReadingNote } from '../lib/notes';
   import type { Position } from '../lib/store';
   import { Epub } from '../lib/epub';
+  import { pageGesture } from '../lib/gesture';
   import { getFile, updateBook, type Book } from '../lib/store';
   export let book: Book;
   export let initialPosition: Position | undefined = undefined;
@@ -192,6 +193,44 @@
         loading = false;
       }
     }
+  }
+  // Swipe or tap an edge of the page to turn it (see lib/gesture.ts).
+  let press:
+    | { id: number; x: number; y: number; t: number; onLink: boolean }
+    | undefined;
+  function pressStart(e: PointerEvent) {
+    if (e.button !== 0) return;
+    const target = e.composedPath()[0];
+    press = {
+      id: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      t: e.timeStamp,
+      onLink:
+        target instanceof Element &&
+        !!target.closest('a[href], a[data-chapter], button, input, select, textarea'),
+    };
+  }
+  function pressEnd(e: PointerEvent) {
+    if (!press || e.pointerId !== press.id) return;
+    const start = press;
+    press = undefined;
+    const box = host.getBoundingClientRect();
+    const selection =
+      (
+        root as ShadowRoot & { getSelection?: () => Selection | null }
+      )?.getSelection?.() || window.getSelection();
+    const direction = pageGesture({
+      width: box.width,
+      startX: start.x - box.left,
+      endX: e.clientX - box.left,
+      dy: e.clientY - start.y,
+      ms: e.timeStamp - start.t,
+      selecting: !!selection && !selection.isCollapsed,
+      onLink: start.onLink,
+      touch: e.pointerType !== 'mouse',
+    });
+    if (direction && !(direction < 0 ? atStart : atEnd)) turn(direction);
   }
   function turn(delta: number) {
     selectedQuote = '';
@@ -478,6 +517,11 @@
       class="reading-page"
       class:pdf={book.format === 'pdf'}
       bind:this={host}
+      role="region"
+      aria-label="Book page: swipe or tap an edge to turn"
+      onpointerdown={pressStart}
+      onpointerup={pressEnd}
+      onpointercancel={() => (press = undefined)}
     >
       {#if book.format === 'pdf'}<div class="pdf-frame" bind:this={pdfFrame}>
           <canvas bind:this={canvas} aria-label={`Page ${page} of ${total}`}

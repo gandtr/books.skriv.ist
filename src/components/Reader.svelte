@@ -23,7 +23,7 @@
   import type { ReadingNote } from '../lib/notes';
   import type { Position } from '../lib/store';
   import { Epub } from '../lib/epub';
-  import { pageGesture } from '../lib/gesture';
+  import { hasSelection, PageGestureTracker } from '../lib/gesture';
   import { getFile, updateBook, type Book } from '../lib/store';
   export let book: Book;
   export let initialPosition: Position | undefined = undefined;
@@ -57,7 +57,7 @@
   let completed = book.status === 'read',
     writeChain = Promise.resolve();
   let sections: { title: string; path: string }[] = [];
-  const readerCss = `:host{display:block;height:100%;min-height:0;overflow:hidden}#flow{height:100%;column-fill:auto;column-gap:48px;line-height:1.7;font-family:Georgia,'Times New Roman',serif;color:var(--ink);overflow:visible;overflow-wrap:anywhere;box-sizing:border-box}#flow>*:first-child{margin-top:0}p{margin:0 0 1em}h1,h2,h3,h4{line-height:1.2;break-after:avoid;font-weight:500}h1{font-size:1.9em}h2{font-size:1.45em}img{display:block;max-width:100%;max-height:85%;object-fit:contain;break-inside:avoid;margin:auto}pre{white-space:pre-wrap;font:0.8em/1.5 monospace}table{max-width:100%;font-size:.85em;border-collapse:collapse}td,th{padding:.4em;border:1px solid var(--line)}a{color:var(--accent)}blockquote{margin:1em;padding-left:1em;border-left:2px solid var(--accent)}hr{border:0;border-top:1px solid var(--line)}`;
+  const readerCss = `:host{display:block;height:100%;min-height:0;overflow:hidden;touch-action:pan-y pinch-zoom}#flow{touch-action:pan-y pinch-zoom;height:100%;column-fill:auto;column-gap:48px;line-height:1.7;font-family:Georgia,'Times New Roman',serif;color:var(--ink);overflow:visible;overflow-wrap:anywhere;box-sizing:border-box}#flow>*:first-child{margin-top:0}p{margin:0 0 1em}h1,h2,h3,h4{line-height:1.2;break-after:avoid;font-weight:500}h1{font-size:1.9em}h2{font-size:1.45em}img{display:block;max-width:100%;max-height:85%;object-fit:contain;break-inside:avoid;margin:auto}pre{white-space:pre-wrap;font:0.8em/1.5 monospace}table{max-width:100%;font-size:.85em;border-collapse:collapse}td,th{padding:.4em;border:1px solid var(--line)}a{color:var(--accent)}blockquote{margin:1em;padding-left:1em;border-left:2px solid var(--accent)}hr{border:0;border-top:1px solid var(--line)}`;
   function persist() {
     if (loading || !readable || !mounted) return;
     const progress = completed
@@ -194,41 +194,36 @@
       }
     }
   }
-  // Swipe or tap an edge of the page to turn it (see lib/gesture.ts).
-  let press:
-    | { id: number; x: number; y: number; t: number; onLink: boolean }
-    | undefined;
+  // Swipe or tap an edge of the page to turn it (touch only; see lib/gesture.ts).
+  const gestures = new PageGestureTracker();
   function pressStart(e: PointerEvent) {
-    if (e.button !== 0) return;
     const target = e.composedPath()[0];
-    press = {
+    gestures.down({
       id: e.pointerId,
       x: e.clientX,
       y: e.clientY,
       t: e.timeStamp,
+      primary: e.isPrimary,
+      type: e.pointerType,
       onLink:
         target instanceof Element &&
         !!target.closest('a[href], a[data-chapter], button, input, select, textarea'),
-    };
+    });
   }
   function pressEnd(e: PointerEvent) {
-    if (!press || e.pointerId !== press.id) return;
-    const start = press;
-    press = undefined;
     const box = host.getBoundingClientRect();
     const selection =
       (
         root as ShadowRoot & { getSelection?: () => Selection | null }
       )?.getSelection?.() || window.getSelection();
-    const direction = pageGesture({
+    const direction = gestures.up({
+      id: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      t: e.timeStamp,
+      left: box.left,
       width: box.width,
-      startX: start.x - box.left,
-      endX: e.clientX - box.left,
-      dy: e.clientY - start.y,
-      ms: e.timeStamp - start.t,
-      selecting: !!selection && !selection.isCollapsed,
-      onLink: start.onLink,
-      touch: e.pointerType !== 'mouse',
+      selecting: hasSelection(selection, root),
     });
     if (direction && !(direction < 0 ? atStart : atEnd)) turn(direction);
   }
@@ -518,10 +513,10 @@
       class:pdf={book.format === 'pdf'}
       bind:this={host}
       role="region"
-      aria-label="Book page: swipe or tap an edge to turn"
+      aria-label="Book page"
       onpointerdown={pressStart}
       onpointerup={pressEnd}
-      onpointercancel={() => (press = undefined)}
+      onpointercancel={() => gestures.cancel()}
     >
       {#if book.format === 'pdf'}<div class="pdf-frame" bind:this={pdfFrame}>
           <canvas bind:this={canvas} aria-label={`Page ${page} of ${total}`}

@@ -90,14 +90,14 @@
     active = undefined;
     history.replaceState(null, '', location.pathname + location.search);
   }
-  let catalogueUrl = '';
+  let pairing = { url: '', id: 0 };
   async function route() {
     // A pairing link from Armarium wins over a reading link in the same fragment.
     const link = takeOpdsLink();
     if (link) {
       active = undefined;
       view = 'catalogues';
-      catalogueUrl = link;
+      pairing = { url: link, id: pairing.id + 1 };
       return;
     }
     const match = parseReadingRoute(location.hash);
@@ -342,7 +342,7 @@
           onread={read}
           onadded={refresh}
         />{:else if view === 'catalogues'}<Catalogue
-          initialUrl={catalogueUrl}
+          {pairing}
           onread={read}
           onadded={refresh}
         />{:else}

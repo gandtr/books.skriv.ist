@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { beforeEach, expect, it } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import { takeOpdsLink } from '../src/lib/pair';
 
 const U = 'https://a.example/opds/t/x_y-z/v1.2/catalog';
@@ -66,4 +66,19 @@ it('the scrubber ignores reading links', () => {
   new Function(readFileSync('public/opds-hash.js', 'utf8'))();
   expect(sessionStorage.getItem('skrivist.opds')).toBeNull();
   expect(location.hash).toBe(READ);
+});
+
+it('the scrubber still strips the fragment when storage is denied, and the app still gets the link', () => {
+  history.replaceState(null, '', '/#opds=' + encodeURIComponent(U));
+  const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    throw new DOMException('quota', 'QuotaExceededError');
+  });
+  try {
+    new Function(readFileSync('public/opds-hash.js', 'utf8'))();
+    expect(location.hash).toBe('');
+  } finally {
+    setItem.mockRestore();
+  }
+  expect(takeOpdsLink()).toBe(U);
+  expect(takeOpdsLink()).toBe('');
 });

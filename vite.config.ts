@@ -54,6 +54,8 @@ export default defineConfig({
       },
     }),
   ],
+  // Component tests mount Svelte, which needs its browser build under vitest.
+  resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined,
   test: { environment: 'jsdom', setupFiles: ['./tests/setup.ts'] },
   build: { target: 'es2022' },
   worker: { format: 'es' },

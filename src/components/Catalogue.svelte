@@ -26,8 +26,8 @@
   import { importBook } from '../lib/import';
   export let onread: (book: Book) => void;
   export let onadded: () => void;
-  /** A catalogue URL from a pairing link: filled in, never fetched until Connect. */
-  export let initialUrl = '';
+  /** The latest pairing link (id counts scans): filled in, never fetched until Connect. */
+  export let pairing: { url: string; id: number } = { url: '', id: 0 };
   let saved: Shelf[] = [],
     url = '',
     username = '',
@@ -45,14 +45,25 @@
   let downloadController: AbortController | undefined;
   let pendingShelf: Shelf | undefined;
   const size = 24;
-  let appliedUrl = '';
-  $: if (initialUrl && initialUrl !== appliedUrl) {
-    appliedUrl = initialUrl;
-    url = initialUrl;
+  let appliedPairing = 0;
+  $: if (pairing.url && pairing.id !== appliedPairing) {
+    appliedPairing = pairing.id;
+    // A new library: drop the old one's request, feed and connection, so nothing
+    // from it lands on screen or in the shelves. A running download keeps going.
+    controller?.abort();
+    controller = undefined;
+    busy = false;
+    feed = null;
+    feedUrl = '';
+    connection = null;
+    history = [];
+    page = 0;
+    pendingShelf = undefined;
+    url = pairing.url;
     username = '';
     password = '';
     error = '';
-    notice = '';
+    if (!downloading) notice = '';
   }
   $: entries = feed?.entries.slice(page * size, (page + 1) * size) || [];
   $: next = feed?.links.find((link) => link.rel.split(/\s+/).includes('next'));

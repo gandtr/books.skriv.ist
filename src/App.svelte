@@ -6,6 +6,7 @@
   import Calibre from './components/Calibre.svelte';
   import Reader from './components/Reader.svelte';
   import { parseReadingRoute } from './lib/notes';
+  import { takeOpdsLink } from './lib/pair';
   let initialPosition: import('./lib/store').Position | undefined;
   let reader: Reader;
   import {
@@ -89,7 +90,16 @@
     active = undefined;
     history.replaceState(null, '', location.pathname + location.search);
   }
+  let catalogueUrl = '';
   async function route() {
+    // A pairing link from Armarium wins over a reading link in the same fragment.
+    const link = takeOpdsLink();
+    if (link) {
+      active = undefined;
+      view = 'catalogues';
+      catalogueUrl = link;
+      return;
+    }
     const match = parseReadingRoute(location.hash);
     if (match) {
       if (active?.id === match.id && reader) {
@@ -332,6 +342,7 @@
           onread={read}
           onadded={refresh}
         />{:else if view === 'catalogues'}<Catalogue
+          initialUrl={catalogueUrl}
           onread={read}
           onadded={refresh}
         />{:else}

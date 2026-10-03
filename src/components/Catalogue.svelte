@@ -26,6 +26,8 @@
   import { importBook } from '../lib/import';
   export let onread: (book: Book) => void;
   export let onadded: () => void;
+  /** A catalogue URL from a pairing link: filled in, never fetched until Connect. */
+  export let initialUrl = '';
   let saved: Shelf[] = [],
     url = '',
     username = '',
@@ -43,6 +45,15 @@
   let downloadController: AbortController | undefined;
   let pendingShelf: Shelf | undefined;
   const size = 24;
+  let appliedUrl = '';
+  $: if (initialUrl && initialUrl !== appliedUrl) {
+    appliedUrl = initialUrl;
+    url = initialUrl;
+    username = '';
+    password = '';
+    error = '';
+    notice = '';
+  }
   $: entries = feed?.entries.slice(page * size, (page + 1) * size) || [];
   $: next = feed?.links.find((link) => link.rel.split(/\s+/).includes('next'));
   $: previous = feed?.links.find(

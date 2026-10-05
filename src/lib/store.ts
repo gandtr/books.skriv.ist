@@ -1,3 +1,4 @@
+import { isDesktop, native, nativeGet } from './desktop';
 export type Status = 'unread' | 'reading' | 'read';
 export interface Position {
   chapter: number;
@@ -30,6 +31,7 @@ export interface Shelf {
 }
 let opening: Promise<IDBDatabase> | undefined;
 export function db(): Promise<IDBDatabase> {
+  if (isDesktop()) return Promise.reject(new Error('Desktop libraries use native storage.'));
   return (opening ??= new Promise((resolve, reject) => {
     const req = indexedDB.open('skrivist-books', 2);
     req.onupgradeneeded = () => {
@@ -73,18 +75,22 @@ function done(tx: IDBTransaction): Promise<void> {
   });
 }
 export async function listBooks(): Promise<Book[]> {
+  if (isDesktop()) return native('list', { store: 'books' });
   const d = await db();
   return request(d.transaction('books').objectStore('books').getAll());
 }
 export async function getBook(id: string): Promise<Book | undefined> {
+  if (isDesktop()) return nativeGet('books', id);
   const d = await db();
   return request(d.transaction('books').objectStore('books').get(id));
 }
 export async function getFile(id: string): Promise<Blob | undefined> {
+  if (isDesktop()) return nativeGet('files', id);
   const d = await db();
   return request(d.transaction('files').objectStore('files').get(id));
 }
 export async function getCover(id: string): Promise<Blob | undefined> {
+  if (isDesktop()) return nativeGet('covers', id);
   const d = await db();
   return request(d.transaction('covers').objectStore('covers').get(id));
 }
@@ -93,6 +99,7 @@ export async function addBook(
   file: Blob,
   cover?: Blob,
 ): Promise<Book> {
+  if (isDesktop()) return native('books_add', { book, file, cover });
   const d = await db(),
     tx = d.transaction(['books', 'files', 'covers'], 'readwrite'),
     finished = done(tx);
@@ -120,6 +127,7 @@ export async function updateBook(
   id: string,
   changes: Partial<Pick<Book, 'status' | 'position' | 'progress'>>,
 ): Promise<void> {
+  if (isDesktop()) return native('books_update', { id, changes });
   const d = await db(),
     tx = d.transaction('books', 'readwrite'),
     finished = done(tx),
@@ -131,6 +139,7 @@ export async function updateBook(
   await finished;
 }
 export async function deleteBook(id: string) {
+  if (isDesktop()) return native('books_delete', { id });
   const d = await db(),
     tx = d.transaction(['books', 'files', 'covers', 'notes'], 'readwrite'),
     finished = done(tx);
@@ -150,6 +159,7 @@ export async function deleteBook(id: string) {
   await finished;
 }
 export async function saveShelf(shelf: Shelf) {
+  if (isDesktop()) return native('put', { store: 'shelves', value: { url: shelf.url, title: shelf.title, username: shelf.username, connectionUrl: shelf.connectionUrl } });
   const d = await db(),
     tx = d.transaction('shelves', 'readwrite'),
     finished = done(tx);
@@ -162,10 +172,12 @@ export async function saveShelf(shelf: Shelf) {
   await finished;
 }
 export async function shelves(): Promise<Shelf[]> {
+  if (isDesktop()) return native('list', { store: 'shelves' });
   const d = await db();
   return request(d.transaction('shelves').objectStore('shelves').getAll());
 }
 export async function forgetShelf(url: string) {
+  if (isDesktop()) return native('delete', { store: 'shelves', key: url });
   const d = await db(),
     tx = d.transaction('shelves', 'readwrite'),
     finished = done(tx);
@@ -173,5 +185,6 @@ export async function forgetShelf(url: string) {
   await finished;
 }
 export async function storageInfo() {
+  if (isDesktop()) return native<{ usage: number; quota?: number }>('usage');
   return navigator.storage?.estimate?.() || {};
 }

@@ -1,3 +1,4 @@
+import { isDesktop, native } from './desktop';
 import { db, type Book, type Position } from './store';
 export interface ReadingNote {
   id: string;
@@ -11,6 +12,7 @@ export interface ReadingNote {
 }
 export type NoteLocation = { position: Position; section: string };
 export async function listNotes(bookId: string): Promise<ReadingNote[]> {
+  if (isDesktop()) return (await native<ReadingNote[]>('list', { store: 'notes' })).filter(note => note.bookId === bookId).sort((a, b) => a.created - b.created);
   const d = await db();
   return new Promise((resolve, reject) => {
     const r = d
@@ -34,6 +36,7 @@ export async function saveNote(note: ReadingNote): Promise<void> {
     throw new Error(
       'Keep quotations under 8,000 characters and notes under 16,000 characters.',
     );
+  if (isDesktop()) return native('books_save_note', { note });
   const d = await db();
   await new Promise<void>((resolve, reject) => {
     const tx = d.transaction(['books', 'notes'], 'readwrite');
@@ -51,6 +54,7 @@ export async function saveNote(note: ReadingNote): Promise<void> {
   });
 }
 export async function removeNote(id: string) {
+  if (isDesktop()) return native('delete', { store: 'notes', key: id });
   const d = await db();
   await new Promise<void>((resolve, reject) => {
     const tx = d.transaction('notes', 'readwrite');
@@ -75,7 +79,7 @@ export function readingLink(
     fraction: String(note.position.fraction),
     page: String(note.position.page),
   });
-  return `${origin}/#${params}`;
+  return isDesktop() ? `skrivist-books://read#${params}` : `${origin}/#${params}`;
 }
 function plainMarkdown(value: string) {
   return (
@@ -102,7 +106,7 @@ export function noteMarkdown(
         .map((line) => '> ' + plainMarkdown(line))
         .join('\n') + '\n\n'
     : '';
-  return `# ${plainMarkdown(book.title)}\n\n${book.author ? plainMarkdown(book.author) + '\n\n' : ''}${plainMarkdown(locationLabel(book, note))} · ${new Date(note.created).toISOString().slice(0, 10)}\n\n${quote}${note.text.trim() ? note.text.trim() + '\n\n' : ''}[Return to this location](${readingLink(book, note, origin)})\n\nBook ID: \`${book.id}\`\nNote ID: \`${note.id}\`\n\n_Skrivist Books · The same book must be stored in this browser to follow the link._\n`;
+  return `# ${plainMarkdown(book.title)}\n\n${book.author ? plainMarkdown(book.author) + '\n\n' : ''}${plainMarkdown(locationLabel(book, note))} · ${new Date(note.created).toISOString().slice(0, 10)}\n\n${quote}${note.text.trim() ? note.text.trim() + '\n\n' : ''}[Return to this location](${readingLink(book, note, origin)})\n\nBook ID: \`${book.id}\`\nNote ID: \`${note.id}\`\n\n_Skrivist Books · The same book must be stored in this ${isDesktop() ? 'app' : 'browser'} to follow the link._\n`;
 }
 export function noteFile(book: Book, note: ReadingNote, folder = 'Reading') {
   const parts = folder.split('/').filter(Boolean);

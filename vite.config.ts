@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig({
+  define: process.env.VITEST ? undefined : { __SKRIVIST_DESKTOP__: JSON.stringify(process.env.SKRIVIST_DESKTOP === '1') },
   plugins: [
     svelte(),
     VitePWA({

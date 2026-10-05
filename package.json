@@ -13,6 +13,7 @@
     "predev": "node scripts/copy-pdf-assets.mjs"
   },
   "dependencies": {
+    "@tauri-apps/api": "2.12.1",
     "dompurify": "^3.2.7",
     "fflate": "^0.8.2",
     "pdfjs-dist": "^6.3.289",

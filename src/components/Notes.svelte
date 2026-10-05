@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isDesktop, openExternal } from '../lib/desktop';
   import { onMount, tick } from 'svelte';
   import { ankiCsv } from '../lib/anki';
   import type { Book } from '../lib/store';
@@ -90,13 +91,14 @@
       busy = false;
     }
   }
-  function exportObsidian(note: ReadingNote) {
+  async function exportObsidian(note: ReadingNote) {
     try {
       const uri = obsidianLink(book, note, vault, folder);
       settings();
-      location.href = uri;
+      if (isDesktop()) await openExternal(uri);
+      else location.href = uri;
       notice =
-        'Note saved here. Obsidian will ask to open it; the browser cannot confirm the vault write.';
+        'Note saved here. Obsidian will ask to open it; confirm the exported note in your vault.';
     } catch (e) {
       error = (e as Error).message;
       if (!vault.trim()) settingsOpen = true;
@@ -288,8 +290,7 @@
   <p class="small-note">
     Anki exports put the passage on the front and your note with its source on
     the back. Without a passage, the front asks what you noted at that location.
-    Import the CSV in Anki, then edit cards there to suit your study. Notes stay
-    in this browser until you export them. Obsidian needs to be installed.
+    Import the CSV in Anki, then edit cards there to suit your study. Notes stay on this device until you export them. Obsidian needs to be installed.
     Scanned PDFs without text support location notes, but cannot provide
     selectable quotations.
   </p>

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import DesktopZoom from './components/DesktopZoom.svelte';
+  import { isDesktop, watchNativeFiles } from './lib/desktop';
   import { registerSW } from 'virtual:pwa-register';
   import BookCard from './components/BookCard.svelte';
   import Catalogue from './components/Catalogue.svelte';
@@ -116,19 +118,27 @@
       }
     } else active = undefined;
   }
+  let nativeIncoming: File[] = [];
+  async function nativeAdd(files: File[]) {
+    nativeIncoming.push(...files);
+    if (!busy && nativeIncoming.length) await add(nativeIncoming.splice(0));
+  }
   onMount(() => {
+    let disposed = false;
+    let stopNative = () => {};
+    if (isDesktop()) void watchNativeFiles(nativeAdd, fragment => { location.hash = fragment; }, message => { error = message; }).then(stop => { if (disposed) stop(); else stopNative = stop; });
     themeMode = localStorage.getItem('books-theme') || 'system';
     applyTheme();
     const media = matchMedia('(prefers-color-scheme: dark)');
     media.addEventListener('change', applyTheme);
-    refresh().then(route);
+    refresh().then(route).catch(e => { error = (e as Error).message; });
     window.addEventListener('hashchange', route);
     const install = (event: Event) => {
       event.preventDefault();
       installPrompt = event;
     };
     window.addEventListener('beforeinstallprompt', install);
-    updateApp = registerSW({
+    if (!isDesktop()) updateApp = registerSW({
       onNeedRefresh() {
         updateReady = true;
       },
@@ -137,6 +147,8 @@
       },
     });
     return () => {
+      disposed = true;
+      stopNative();
       window.removeEventListener('hashchange', route);
       window.removeEventListener('beforeinstallprompt', install);
       media.removeEventListener('change', applyTheme);
@@ -173,15 +185,17 @@
       : `${count} book${count === 1 ? '' : 's'} added to this device.`;
     busy = false;
     page = 0;
-    await refresh();
-    if (failed.length)
-      error =
-        failed.slice(0, 3).join(' · ') +
-        (failed.length > 3
-          ? ` · ${failed.length - 3} more files could not be added.`
-          : '');
-    if (fileInput) fileInput.value = '';
-    if (directoryInput) directoryInput.value = '';
+    try {
+      await refresh();
+      if (failed.length)
+        error = failed.slice(0, 3).join(' · ') + (failed.length > 3 ? ` · ${failed.length - 3} more files could not be added.` : '');
+    } catch (e) {
+      error = (e as Error).message;
+    } finally {
+      if (fileInput) fileInput.value = '';
+      if (directoryInput) directoryInput.value = '';
+      if (nativeIncoming.length) await nativeAdd([]);
+    }
   }
   async function mark(book: Book) {
     await updateBook(
@@ -212,7 +226,7 @@
       const estimate = await storageInfo();
       storage = estimate.usage
         ? `${(estimate.usage / 1024 / 1024).toFixed(1)} MB stored on this device`
-        : 'Your library stays in this browser';
+        : isDesktop() ? 'Your library is stored on this device' : 'Your library stays in this browser';
     }
   }
   async function install() {
@@ -226,6 +240,8 @@
     }
   }
 </script>
+
+{#if isDesktop()}<DesktopZoom />{/if}
 
 <svelte:head
   ><title>{active ? active.title + ' — ' : ''}Skrivist Books</title
@@ -275,9 +291,8 @@
           >{theme === 'light' ? '☾' : '☀'}</button
         ><button class="quiet" onclick={info} aria-label="About and storage"
           >ⓘ</button
-        ><button class="secondary install-button" onclick={install}
-          >Install app ↗</button
         >
+        {#if !isDesktop()}<button class="secondary install-button" onclick={install}>Install app ↗</button>{/if}
       </div>
     </header>
     <main class="app-main">
@@ -312,16 +327,14 @@
           <h2>Just you and your books.</h2>
           <p>
             Skrivist Books reads EPUB and PDF files on your device. No account,
-            cloud library, or uploads. It is separate from app.skriv.ist. Page
-            visits are counted with cookie-free Cloudflare Web Analytics.
+            cloud library, or uploads. It is separate from app.skriv.ist. {#if !isDesktop()}Page visits are counted with cookie-free Cloudflare Web Analytics.{/if}
           </p>
           <p>
-            {storage}. Browser storage can be cleared or evicted, so keep your
-            original files. Reading positions belong to this browser and do not
+            {storage}. {#if isDesktop()}Keep copies of your original files as a backup.{:else}Browser storage can be cleared or evicted, so keep your original files.{/if} Reading positions belong to this installation and do not
             sync to other devices.
           </p>
           <div class="info-links">
-            <button
+            {#if !isDesktop()}<button
               class="secondary"
               onclick={async () => {
                 const granted = await navigator.storage?.persist?.();
@@ -332,8 +345,8 @@
             ><a
               href="https://github.com/gandtr/books.skriv.ist#omarchy"
               target="_blank"
-              rel="noreferrer">Install for Omarchy ↗</a
-            ><a
+              rel="noreferrer">Install for Omarchy ↗</a>{/if}
+            <a
               href="https://github.com/gandtr/books.skriv.ist"
               target="_blank"
               rel="noreferrer">Source & help ↗</a

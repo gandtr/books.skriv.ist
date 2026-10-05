@@ -334,6 +334,9 @@
             sync to other devices.
           </p>
           <div class="info-links">
+            <a href="https://skriv.ist/" target="_blank" rel="noopener noreferrer">skriv.ist ↗</a>
+            <a href="https://gand.tr/" target="_blank" rel="noopener noreferrer">gand.tr ↗</a>
+            <a href="https://c0ze.github.io/armarium/" target="_blank" rel="noopener noreferrer">Armarium project ↗</a>
             {#if !isDesktop()}<button
               class="secondary"
               onclick={async () => {
@@ -496,9 +499,12 @@
         href="https://comics.skriv.ist"
         target="_blank"
         rel="noreferrer">More of a comics person? ↗</a
-      ><a href="https://skriv.ist/" target="_blank" rel="noreferrer"
-        >skriv.ist · Skrivist Cloud coming soon ↗</a
       >
+      <nav class="project-links" aria-label="Skrivist and Gand projects">
+        <a href="https://skriv.ist/" target="_blank" rel="noopener noreferrer">skriv.ist ↗</a>
+        <a href="https://gand.tr/" target="_blank" rel="noopener noreferrer">gand.tr ↗</a>
+        <a href="https://c0ze.github.io/armarium/" target="_blank" rel="noopener noreferrer">Armarium project ↗</a>
+      </nav>
     </footer>
   </div>
 {/if}

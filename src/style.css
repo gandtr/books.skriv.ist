@@ -267,6 +267,7 @@ svg {
 }
 .app-footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 20px;
@@ -282,6 +283,12 @@ svg {
 }
 .app-footer a {
   text-decoration: none;
+}
+.project-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
 }
 .static-intro {
   max-width: 640px;

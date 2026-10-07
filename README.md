@@ -43,9 +43,9 @@ Use **Refresh library** after changing metadata in Calibre (close Calibre again 
 
 Add your own OPDS 1 (Atom) or OPDS 2 catalogue in **Catalogues**. Save connections and individual shelves. Browse 24 entries at a time; server pagination is followed only when needed. Book files download only when you press **Read book**, then remain available locally.
 
-Requests go directly from your browser to your catalogue. The server must permit CORS for your reader's origin (including the Authorization header for Basic login). The public HTTPS app needs an HTTPS catalogue. To use a local HTTP catalogue, run the local app below and allow its origin on your server. There is no public proxy.
+Requests go directly from your browser to your catalogue. The server must permit CORS for your reader's origin (including the Authorization header for Basic or token login). The public HTTPS app needs an HTTPS catalogue. To use a local HTTP catalogue, run the local app below and allow its origin on your server. There is no public proxy.
 
-Passwords remain in memory for the current session, scoped to the catalogue origin and username. Saved feed URLs may contain access tokens, so treat this browser profile as private. Redirects are disabled to prevent credential forwarding; enter the final feed URL. A server without pagination still sends its metadata listing, but books are always fetched individually.
+Passwords and pairing tokens remain in memory for the current session, scoped to the catalogue origin and username. An Armarium token in an `/opds/t/<token>/` URL (a pairing link or a typed URL) is moved into an `Authorization: Bearer` header, so it never appears in a request URL, a saved shelf or a downloaded book's record; pair again after closing the tab. Feed URLs of other servers may still carry access tokens in a query string, so treat this browser profile as private. Redirects are disabled to prevent credential forwarding; enter the final feed URL. A server without pagination still sends its metadata listing, but books are always fetched individually.
 
 ## Omarchy
 

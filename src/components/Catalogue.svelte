@@ -4,6 +4,7 @@
     acquisition,
     navigation,
     safeUrl,
+    plainRequest,
     rememberConnection,
     forgetConnection,
     savedConnection,
@@ -28,6 +29,8 @@
   export let onadded: () => void;
   /** The latest pairing link (id counts scans): filled in, never fetched until Connect. */
   export let pairing: { url: string; id: number } = { url: '', id: 0 };
+  /** Called once the pairing link is taken, so its owner can drop it for good. */
+  export let onpaired: () => void = () => {};
   let saved: Shelf[] = [],
     url = '',
     username = '',
@@ -64,6 +67,7 @@
     password = '';
     error = '';
     if (!downloading) notice = '';
+    onpaired();
   }
   $: entries = feed?.entries.slice(page * size, (page + 1) * size) || [];
   $: next = feed?.links.find((link) => link.rel.split(/\s+/).includes('next'));
@@ -81,7 +85,7 @@
     controller?.abort();
     downloadController?.abort();
   });
-  async function load(target: string, conn: Connection, remember = true) {
+  async function load(target: string, from: Connection, remember = true) {
     controller?.abort();
     const current = new AbortController();
     controller = current;
@@ -89,7 +93,12 @@
     error = '';
     notice = '';
     try {
-      const parsed = await getFeed(safeUrl(target), conn, current.signal);
+      // A /opds/t/<token>/ URL becomes a plain one plus a Bearer token: the
+      // token stays out of every URL we fetch, keep in history or store.
+      const plain = plainRequest(safeUrl(target), from);
+      target = plain.target;
+      const conn = plain.connection;
+      const parsed = await getFeed(target, conn, current.signal);
       if (current !== controller) return;
       feed = parsed;
       feedUrl = target;
@@ -281,7 +290,7 @@
   <p class="small-note">
     Connects directly to your server. It must allow browser access (CORS). The
     public app needs an HTTPS catalogue; a local installation can use HTTP.
-    Passwords are never saved.
+    Passwords and pairing tokens are never saved.
   </p>
   {#if error}<p class="message error" role="alert">{error}</p>{/if}
   {#if notice}<p class="message" role="status">

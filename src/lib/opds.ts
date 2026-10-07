@@ -19,6 +19,8 @@ export interface Connection {
   url: string;
   username: string;
   password: string;
+  /** An Armarium API token: sent as a Bearer header, never part of a URL. */
+  token?: string;
 }
 export const MAX_DOWNLOAD = 128 * 1024 * 1024;
 const FEED_LIMIT = 4 * 1024 * 1024;
@@ -31,6 +33,50 @@ export function safeUrl(value: string, base?: string): string {
   )
     throw new Error('Use an HTTP or HTTPS URL without embedded credentials.');
   return url.href;
+}
+const TOKEN_PATH = /^\/opds\/t\/([^/]+)(\/.*)?$/;
+/**
+ * Armarium accepts its API token in the path (/opds/t/<token>/v1.2/…). A request
+ * URL is logged by every proxy on the way, so the token is moved out of it: the
+ * plain /opds/… URL and the token, to send as a Bearer header.
+ */
+export function splitToken(value: string): { url: string; token: string } {
+  try {
+    const url = new URL(value);
+    const match = TOKEN_PATH.exec(url.pathname);
+    if (!match || !['http:', 'https:'].includes(url.protocol))
+      return { url: value, token: '' };
+    url.pathname = '/opds' + (match[2] ?? '');
+    let token = match[1];
+    try {
+      token = decodeURIComponent(token);
+    } catch {
+      // Not valid percent-encoding: use the token as written.
+    }
+    return { url: url.href, token };
+  } catch {
+    return { url: value, token: '' };
+  }
+}
+/**
+ * A request with the path token moved into the connection, so the URL fetched,
+ * remembered and stored stays plain. Only the connection's own origin is
+ * touched: another origin's token path is not ours to strip or reuse.
+ */
+export function plainRequest(
+  target: string,
+  connection: Connection,
+): { target: string; connection: Connection } {
+  const own = splitToken(connection.url);
+  const linked =
+    new URL(target).origin === new URL(own.url).origin
+      ? splitToken(target)
+      : { url: target, token: '' };
+  const token = connection.token || own.token || linked.token;
+  return {
+    target: linked.url,
+    connection: { ...connection, url: own.url, ...(token ? { token } : {}) },
+  };
 }
 export function acquisition(link: Link): boolean {
   return (
@@ -168,10 +214,10 @@ export function parseFeed(text: string, url: string): Feed {
 function headers(url: string, connection: Connection): Headers {
   const result = new Headers();
   // Credentials never follow a catalogue link to another origin.
-  if (
-    connection.username &&
-    new URL(url).origin === new URL(connection.url).origin
-  ) {
+  if (new URL(url).origin !== new URL(connection.url).origin) return result;
+  if (connection.token)
+    result.set('Authorization', `Bearer ${connection.token}`);
+  else if (connection.username) {
     const bytes = new TextEncoder().encode(
       `${connection.username}:${connection.password}`,
     );
@@ -188,7 +234,9 @@ export async function fetchLimited(
   limit: number,
   signal?: AbortSignal,
 ): Promise<{ blob: Blob; type: string; url: string }> {
-  url = safeUrl(url);
+  const plain = plainRequest(safeUrl(url), connection);
+  url = plain.target;
+  connection = plain.connection;
   if (location.protocol === 'https:' && new URL(url).protocol === 'http:')
     throw new Error(
       'This HTTPS reader needs an HTTPS catalogue. Use the local app for an HTTP server.',
@@ -223,7 +271,7 @@ export async function fetchLimited(
       await response.body?.cancel();
       throw new Error(
         response.status === 401 || response.status === 403
-          ? 'Catalogue login was rejected. Check your username and password.'
+          ? 'Catalogue login was rejected. Check your username and password, or open the pairing link again.'
           : `Catalogue returned HTTP ${response.status}.`,
       );
     }
@@ -273,7 +321,22 @@ export async function getFeed(
   signal?: AbortSignal,
 ): Promise<Feed> {
   const result = await fetchLimited(url, connection, FEED_LIMIT, signal);
-  return parseFeed(await result.blob.text(), result.url);
+  const feed = parseFeed(await result.blob.text(), result.url);
+  // A server that keeps the request's token prefix in its links must not get the
+  // token back into the URLs we browse, remember or store.
+  const origin = new URL(connection.url).origin;
+  const plain = (link: Link): Link =>
+    new URL(link.href).origin === origin
+      ? { ...link, href: splitToken(link.href).url }
+      : link;
+  return {
+    ...feed,
+    links: feed.links.map(plain),
+    entries: feed.entries.map((entry) => ({
+      ...entry,
+      links: entry.links.map(plain),
+    })),
+  };
 }
 export async function getBookFile(
   entry: Entry,
@@ -298,7 +361,7 @@ export async function getBookFile(
   );
 }
 
-// Passwords stay in memory and are scoped to their exact account and origin.
+// Passwords and tokens stay in memory and are scoped to their exact account and origin.
 const sessions = new Map<string, Connection>();
 const sessionKey = (url: string, username: string) =>
   new URL(url).origin + '\n' + username;

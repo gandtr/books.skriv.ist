@@ -90,6 +90,8 @@
     active = undefined;
     history.replaceState(null, '', location.pathname + location.search);
   }
+  // The catalogue page takes the link once (onpaired) and App forgets it, so
+  // reopening Catalogues later never replays it.
   let pairing = { url: '', id: 0 };
   async function route() {
     // A pairing link from Armarium wins over a reading link in the same fragment.
@@ -343,6 +345,7 @@
           onadded={refresh}
         />{:else if view === 'catalogues'}<Catalogue
           {pairing}
+          onpaired={() => (pairing = { url: '', id: pairing.id })}
           onread={read}
           onadded={refresh}
         />{:else}

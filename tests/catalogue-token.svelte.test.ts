@@ -2,7 +2,7 @@ import { flushSync, mount, tick, unmount } from 'svelte';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import Catalogue from '../src/components/Catalogue.svelte';
 import { db, shelves, forgetShelf } from '../src/lib/store';
-import { forgetConnection } from '../src/lib/opds';
+import { forgetConnection, savedConnection } from '../src/lib/opds';
 
 const TOKEN = 'tok_en-123';
 const PAIRED = `https://a.example/opds/t/${TOKEN}/v1.2/catalog`;
@@ -18,12 +18,17 @@ const atom = (title: string, prefix: string) =>
 
 const realFetch = globalThis.fetch;
 let requests: { url: string; authorization: string | null }[];
+// A test can hold every response back, or turn the server into one that wants a login.
+let gate: Promise<void> | undefined;
+let requireAuth = false;
 let target: HTMLElement;
 let app: ReturnType<typeof mount> | undefined;
 
 beforeEach(async () => {
   for (const shelf of await shelves()) await forgetShelf(shelf.url);
   requests = [];
+  gate = undefined;
+  requireAuth = false;
   // Each test starts as a fresh page load: nothing remembered in memory.
   forgetConnection(PLAIN, '');
   // A server that still emits token-bearing links, whatever the request used.
@@ -32,6 +37,9 @@ beforeEach(async () => {
       url,
       authorization: new Headers(init?.headers).get('Authorization'),
     });
+    if (gate) await gate;
+    if (requireAuth && !requests.at(-1)!.authorization)
+      return new Response('', { status: 401 });
     if (url.endsWith('/file')) return new Response('not an epub');
     return new Response(
       atom(
@@ -80,7 +88,9 @@ it('connects a pairing link with the plain URL and a Bearer header', async () =>
   expect(target.querySelector('.catalogue-heading')?.textContent).toContain(
     'Library',
   );
-  // Connecting again from the same form works the same way.
+  // The form no longer holds the token URL; connecting again still works,
+  // because the token is remembered.
+  expect(urlField().value).toBe(PLAIN);
   urlField().closest('form')!.requestSubmit();
   await settle();
   expect(requests.at(-1)).toEqual({
@@ -224,6 +234,72 @@ it('deletes the stored token when the shelf is forgotten', async () => {
   expect(await rawShelves()).toEqual([]);
   await reload();
   expect(target.querySelector('.saved-shelf')).toBeNull();
+});
+
+it('does not restore a shelf forgotten while it was still loading', async () => {
+  mountCatalogue();
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  await reload();
+  let release!: () => void;
+  gate = new Promise<void>((resolve) => (release = resolve));
+  button(/Library/).click();
+  await settle();
+  expect(requests).toHaveLength(1);
+  target.querySelector<HTMLButtonElement>('[aria-label^=Forget]')!.click();
+  await settle();
+  release();
+  await settle();
+  expect(await rawShelves()).toEqual([]);
+  expect(savedConnection(PLAIN, '')?.token).toBeUndefined();
+  expect(target.querySelector('.catalogue-heading')).toBeNull();
+  expect(target.querySelector('.saved-shelf')).toBeNull();
+  expect(button(/Connect/).disabled).toBe(false);
+});
+
+it('does not bring a forgotten shelf back when Connect is pressed again', async () => {
+  mountCatalogue();
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  target.querySelector<HTMLButtonElement>('[aria-label^=Forget]')!.click();
+  await settle();
+  requireAuth = true;
+  requests = [];
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  expect(requests).toEqual([{ url: PLAIN, authorization: null }]);
+  expect(await rawShelves()).toEqual([]);
+  expect(target.querySelector('.catalogue-heading')).toBeNull();
+});
+
+it('takes a token out of the form when its shelf is forgotten', async () => {
+  mountCatalogue();
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  urlField().value = PAIRED;
+  urlField().dispatchEvent(new Event('input'));
+  flushSync();
+  target.querySelector<HTMLButtonElement>('[aria-label^=Forget]')!.click();
+  await settle();
+  expect(urlField().value).toBe(PLAIN);
+});
+
+it('never takes a feed link carrying the token to another origin', async () => {
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    requests.push({
+      url,
+      authorization: new Headers(init?.headers).get('Authorization'),
+    });
+    return new Response(`<feed xmlns="http://www.w3.org/2005/Atom"><title>Library</title>
+      <entry><title>Away</title><link rel="subsection" href="https://cdn.example/opds/t/${TOKEN}/v1.2/recent" type="application/atom+xml"/></entry>
+    </feed>`);
+  }) as typeof fetch;
+  mountCatalogue();
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  expect(target.querySelector('.catalogue-entry button')).toBeNull();
+  expect(requests).toHaveLength(1);
+  expect(requests[0].url).toBe(PLAIN);
 });
 
 it('connects a token URL typed into the field the same way', async () => {

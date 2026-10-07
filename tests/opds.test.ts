@@ -262,6 +262,55 @@ describe('Armarium path tokens', () => {
       'https://b.example/opds/t/other/v1.2/catalog',
     ]);
   });
+  it('refuses a link to another origin that carries the active token', async () => {
+    const fetcher = vi.fn(
+      async (_url: string, _init?: RequestInit) => new Response('ok'),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    const connection = {
+      url: 'https://a.example/opds/v1.2/catalog',
+      username: '',
+      password: '',
+      token: TOKEN,
+    };
+    for (const href of [
+      `https://cdn.example/opds/t/${TOKEN}/v1.2/items/7/file`,
+      `https://cdn.example/files/${encodeURIComponent(TOKEN)}/7.epub`,
+      `https://cdn.example/7.epub?token=${TOKEN}`,
+    ])
+      await expect(fetchLimited(href, connection, 10)).rejects.toThrow(
+        'pairing token',
+      );
+    expect(fetcher).not.toHaveBeenCalled();
+    // Another server's own token is not ours: that link still opens, unauthenticated.
+    await fetchLimited(
+      'https://cdn.example/opds/t/other/v1.2/items/7/file',
+      connection,
+      10,
+    );
+    const [, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Headers).has('Authorization')).toBe(false);
+  });
+  it('drops feed links that would take the token to another origin', async () => {
+    const feed = `<feed xmlns="http://www.w3.org/2005/Atom"><title>Library</title>
+      <link rel="next" href="https://cdn.example/opds/t/${TOKEN}/v1.2/recent" type="application/atom+xml"/>
+      <entry><title>Book</title>
+        <link rel="http://opds-spec.org/acquisition" href="https://cdn.example/opds/t/${TOKEN}/v1.2/items/7/file" type="application/epub+zip"/>
+        <link rel="http://opds-spec.org/acquisition" href="/opds/t/${TOKEN}/v1.2/items/7/file" type="application/epub+zip"/>
+      </entry></feed>`;
+    vi.stubGlobal('Blob', NodeBlob);
+    vi.stubGlobal('fetch', async () => new Response(feed));
+    const result = await getFeed('https://a.example/opds/v1.2/catalog', {
+      url: 'https://a.example/opds/v1.2/catalog',
+      username: '',
+      password: '',
+      token: TOKEN,
+    });
+    expect(result.links).toEqual([]);
+    expect(result.entries[0].links.map((l) => l.href)).toEqual([
+      'https://a.example/opds/v1.2/items/7/file',
+    ]);
+  });
   it('keeps Basic login working unchanged', async () => {
     const fetcher = vi.fn(
       async (_url: string, _init?: RequestInit) => new Response('ok'),

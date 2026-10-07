@@ -5,6 +5,7 @@
     navigation,
     safeUrl,
     plainRequest,
+    splitToken,
     rememberConnection,
     forgetConnection,
     savedConnection,
@@ -37,7 +38,9 @@
     password = '',
     feed: Feed | null = null,
     feedUrl = '',
-    connection: Connection | null = null;
+    connection: Connection | null = null,
+    // The connection a request in flight will use, shown or not yet.
+    loading: Connection | undefined;
   let page = 0,
     busy = false,
     error = '',
@@ -55,6 +58,7 @@
     // from it lands on screen or in the shelves. A running download keeps going.
     controller?.abort();
     controller = undefined;
+    loading = undefined;
     busy = false;
     feed = null;
     feedUrl = '';
@@ -89,6 +93,7 @@
     controller?.abort();
     const current = new AbortController();
     controller = current;
+    loading = from;
     busy = true;
     error = '';
     notice = '';
@@ -105,6 +110,8 @@
       connection = conn;
       rememberConnection(conn);
       page = 0;
+      // Paired: the form keeps the plain URL, the token lives with the connection.
+      if (remember && url === from.url) url = conn.url;
       if (remember) {
         await saveShelf({
           url: target,
@@ -118,20 +125,35 @@
     } catch (e) {
       if (!current.signal.aborted) error = (e as Error).message;
     } finally {
-      if (current === controller) busy = false;
+      if (current === controller) {
+        busy = false;
+        loading = undefined;
+      }
     }
   }
   function connect() {
     history = [];
-    const conn = { url, username, password };
-    const target =
+    const conn: Connection = { url, username, password };
+    const shelf =
       pendingShelf &&
       pendingShelf.connectionUrl === url &&
       pendingShelf.username === username
-        ? pendingShelf.url
-        : url;
+        ? pendingShelf
+        : undefined;
+    // A paired form shows the plain URL: the token comes from this session or
+    // from the shelf, unless a fresh token URL was just typed.
+    if (!splitToken(url).token) {
+      let token: string | undefined;
+      try {
+        token = savedConnection(url, username)?.token;
+      } catch {
+        // Not a URL: load() reports it.
+      }
+      token ||= shelf?.token;
+      if (token) conn.token = token;
+    }
     pendingShelf = undefined;
-    load(target, conn);
+    load(shelf ? shelf.url : url, conn);
   }
   function savedOpen(shelf: Shelf) {
     pendingShelf = shelf;
@@ -156,19 +178,37 @@
   }
 
   async function forget(shelf: Shelf) {
-    await forgetShelf(shelf.url);
-    forgetConnection(shelf.connectionUrl, shelf.username);
-    password = '';
-    if (
-      connection &&
-      new URL(connection.url).origin === new URL(shelf.connectionUrl).origin &&
-      connection.username === shelf.username
-    ) {
+    const same = (c: { url: string; username: string }) => {
+      try {
+        return (
+          new URL(c.url).origin === new URL(shelf.connectionUrl).origin &&
+          c.username === shelf.username
+        );
+      } catch {
+        return false;
+      }
+    };
+    // Stop whatever uses these credentials before touching storage, shown or
+    // not: a load still in flight would otherwise put the connection back.
+    if (loading && same(loading)) {
+      controller?.abort();
+      controller = undefined;
+      loading = undefined;
+      busy = false;
+    }
+    if (connection && same(connection)) {
       connection = null;
       feed = null;
       controller?.abort();
       downloadController?.abort();
     }
+    forgetConnection(shelf.connectionUrl, shelf.username);
+    password = '';
+    if (pendingShelf?.url === shelf.url) pendingShelf = undefined;
+    // A token still in the form would let Connect bring the shelf back.
+    const typed = splitToken(url);
+    if (typed.token && same({ url, username: shelf.username })) url = typed.url;
+    await forgetShelf(shelf.url);
     saved = await shelves();
   }
   function browse(link: Link) {

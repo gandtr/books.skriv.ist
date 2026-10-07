@@ -78,6 +78,35 @@ export function plainRequest(
     connection: { ...connection, url: own.url, ...(token ? { token } : {}) },
   };
 }
+/**
+ * Whether a URL carries the token in its path (a /opds/t/<token>/ prefix or any
+ * other segment) or in a query value. Such a URL never leaves the origin the
+ * token belongs to.
+ */
+export function carriesToken(href: string, token?: string): boolean {
+  if (!token) return false;
+  try {
+    const url = new URL(href);
+    const decode = (part: string) => {
+      try {
+        return decodeURIComponent(part);
+      } catch {
+        return part;
+      }
+    };
+    return (
+      url.pathname
+        .split('/')
+        .some((part) => part === token || decode(part) === token) ||
+      [...url.searchParams.values()].includes(token)
+    );
+  } catch {
+    return false;
+  }
+}
+const leaksToken = (href: string, connection: Connection) =>
+  new URL(href).origin !== new URL(connection.url).origin &&
+  carriesToken(href, connection.token);
 export function acquisition(link: Link): boolean {
   return (
     link.rel
@@ -237,6 +266,10 @@ export async function fetchLimited(
   const plain = plainRequest(safeUrl(url), connection);
   url = plain.target;
   connection = plain.connection;
+  if (leaksToken(url, connection))
+    throw new Error(
+      'That link would send your pairing token to another server, so it was not opened.',
+    );
   if (location.protocol === 'https:' && new URL(url).protocol === 'http:')
     throw new Error(
       'This HTTPS reader needs an HTTPS catalogue. Use the local app for an HTTP server.',
@@ -320,21 +353,31 @@ export async function getFeed(
   connection: Connection,
   signal?: AbortSignal,
 ): Promise<Feed> {
-  const result = await fetchLimited(url, connection, FEED_LIMIT, signal);
+  const request = plainRequest(safeUrl(url), connection);
+  connection = request.connection;
+  const result = await fetchLimited(
+    request.target,
+    connection,
+    FEED_LIMIT,
+    signal,
+  );
   const feed = parseFeed(await result.blob.text(), result.url);
-  // A server that keeps the request's token prefix in its links must not get the
-  // token back into the URLs we browse, remember or store.
   const origin = new URL(connection.url).origin;
-  const plain = (link: Link): Link =>
-    new URL(link.href).origin === origin
-      ? { ...link, href: splitToken(link.href).url }
-      : link;
+  // A server that keeps the request's token prefix in its links must not get the
+  // token back into the URLs we browse, remember or store; a link that would
+  // carry the token to another origin is dropped, never shown or stored.
+  const plain = (link: Link): Link[] =>
+    leaksToken(link.href, connection)
+      ? []
+      : new URL(link.href).origin === origin
+        ? [{ ...link, href: splitToken(link.href).url }]
+        : [link];
   return {
     ...feed,
-    links: feed.links.map(plain),
+    links: feed.links.flatMap(plain),
     entries: feed.entries.map((entry) => ({
       ...entry,
-      links: entry.links.map(plain),
+      links: entry.links.flatMap(plain),
     })),
   };
 }

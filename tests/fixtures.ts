@@ -27,6 +27,9 @@ export function epubFile(
     Object.fromEntries(
       Object.entries(files).map(([path, text]) => [path, strToU8(text)]),
     ),
+    // A fixed mtime keeps identical fixtures byte-identical; the default
+    // (now) splits dedup tests that straddle a 2-second DOS-time boundary.
+    { mtime: new Date('2026-01-01T00:00:00Z') },
   );
   return new File([archive as Uint8Array<ArrayBuffer>], 'small.epub', {
     type: 'application/epub+zip',

@@ -111,6 +111,7 @@
           title: parsed.title,
           username: conn.username,
           connectionUrl: conn.url,
+          token: conn.token,
         });
         saved = await shelves();
       }
@@ -134,7 +135,15 @@
   }
   function savedOpen(shelf: Shelf) {
     pendingShelf = shelf;
-    const conn = savedConnection(shelf.connectionUrl, shelf.username);
+    let conn = savedConnection(shelf.connectionUrl, shelf.username);
+    // A paired shelf keeps its token on this device, so it opens after a reload.
+    if (shelf.token && !conn?.token)
+      conn = {
+        url: shelf.connectionUrl,
+        username: shelf.username,
+        password: conn?.password ?? '',
+        token: shelf.token,
+      };
     url = shelf.connectionUrl;
     username = shelf.username;
     password = '';
@@ -236,6 +245,7 @@
         title: feed.title,
         connectionUrl: connection.url,
         username: connection.username,
+        token: connection.token,
       });
       saved = await shelves();
       notice = 'Shelf saved. Books download only when you open them.';
@@ -290,7 +300,7 @@
   <p class="small-note">
     Connects directly to your server. It must allow browser access (CORS). The
     public app needs an HTTPS catalogue; a local installation can use HTTP.
-    Passwords and pairing tokens are never saved.
+    Pairing tokens are kept on this device; passwords are never saved.
   </p>
   {#if error}<p class="message error" role="alert">{error}</p>{/if}
   {#if notice}<p class="message" role="status">

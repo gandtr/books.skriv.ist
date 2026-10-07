@@ -361,7 +361,8 @@ export async function getBookFile(
   );
 }
 
-// Passwords and tokens stay in memory and are scoped to their exact account and origin.
+// Passwords stay in memory, scoped to their exact account and origin. A pairing
+// token is remembered here too; the saved shelf keeps its own copy on the device.
 const sessions = new Map<string, Connection>();
 const sessionKey = (url: string, username: string) =>
   new URL(url).origin + '\n' + username;

@@ -1,7 +1,8 @@
 import { flushSync, mount, tick, unmount } from 'svelte';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import Catalogue from '../src/components/Catalogue.svelte';
-import { shelves, forgetShelf } from '../src/lib/store';
+import { db, shelves, forgetShelf } from '../src/lib/store';
+import { forgetConnection } from '../src/lib/opds';
 
 const TOKEN = 'tok_en-123';
 const PAIRED = `https://a.example/opds/t/${TOKEN}/v1.2/catalog`;
@@ -23,6 +24,8 @@ let app: ReturnType<typeof mount> | undefined;
 beforeEach(async () => {
   for (const shelf of await shelves()) await forgetShelf(shelf.url);
   requests = [];
+  // Each test starts as a fresh page load: nothing remembered in memory.
+  forgetConnection(PLAIN, '');
   // A server that still emits token-bearing links, whatever the request used.
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
     requests.push({
@@ -118,11 +121,27 @@ it('downloads a book from a plain URL with the Bearer header', async () => {
   for (const request of requests) expect(request.url).not.toContain(TOKEN);
 });
 
-it('stores no token in the saved shelf', async () => {
+const rawShelves = async () => {
+  const d = await db();
+  return new Promise<any[]>((resolve, reject) => {
+    const req = d.transaction('shelves').objectStore('shelves').getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+};
+const reload = async (url = '') => {
+  unmount(app!);
+  target.replaceChildren();
+  // A reload drops everything held in memory, the remembered token too.
+  forgetConnection(PLAIN, '');
+  requests = [];
+  mountCatalogue(url);
+  await settle();
+};
+
+it('keeps the token in its own field of the saved shelf, never in a URL', async () => {
   mountCatalogue();
   urlField().closest('form')!.requestSubmit();
-  await settle();
-  button(/Save this shelf/).click();
   await settle();
   const saved = await shelves();
   expect(saved).toHaveLength(1);
@@ -130,8 +149,12 @@ it('stores no token in the saved shelf', async () => {
     url: PLAIN,
     connectionUrl: PLAIN,
     username: '',
+    token: TOKEN,
   });
-  expect(JSON.stringify(saved)).not.toContain(TOKEN);
+  expect(saved[0].url + saved[0].connectionUrl).not.toContain(TOKEN);
+  button(/Save this shelf/).click();
+  await settle();
+  expect(await shelves()).toEqual(saved);
 });
 
 it('reopens a saved shelf in the same session with the remembered token', async () => {
@@ -146,6 +169,61 @@ it('reopens a saved shelf in the same session with the remembered token', async 
   button(/Library/).click();
   await settle();
   expect(requests).toEqual([{ url: PLAIN, authorization: `Bearer ${TOKEN}` }]);
+});
+
+it('reopens a paired shelf after a reload without pairing again', async () => {
+  mountCatalogue();
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  await reload();
+  button(/Library/).click();
+  await settle();
+  expect(requests).toEqual([{ url: PLAIN, authorization: `Bearer ${TOKEN}` }]);
+  expect(target.querySelector('.catalogue-heading')?.textContent).toContain(
+    'Library',
+  );
+  expect(target.querySelector('[role=alert]')).toBeNull();
+});
+
+it('opens a shelf saved with the token in its URL and scrubs the stored record', async () => {
+  const d = await db();
+  await new Promise<void>((resolve, reject) => {
+    const tx = d.transaction('shelves', 'readwrite');
+    tx.objectStore('shelves').put({
+      url: PAIRED,
+      connectionUrl: PAIRED,
+      username: '',
+      title: 'Library',
+    });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  mountCatalogue('');
+  await settle();
+  expect(await rawShelves()).toEqual([
+    {
+      url: PLAIN,
+      connectionUrl: PLAIN,
+      username: '',
+      title: 'Library',
+      token: TOKEN,
+    },
+  ]);
+  button(/Library/).click();
+  await settle();
+  expect(requests).toEqual([{ url: PLAIN, authorization: `Bearer ${TOKEN}` }]);
+});
+
+it('deletes the stored token when the shelf is forgotten', async () => {
+  mountCatalogue();
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  expect(await rawShelves()).toHaveLength(1);
+  target.querySelector<HTMLButtonElement>('[aria-label^=Forget]')!.click();
+  await settle();
+  expect(await rawShelves()).toEqual([]);
+  await reload();
+  expect(target.querySelector('.saved-shelf')).toBeNull();
 });
 
 it('connects a token URL typed into the field the same way', async () => {
@@ -178,4 +256,12 @@ it('keeps Basic-auth catalogues unchanged', async () => {
       authorization: `Basic ${btoa('reader:secret')}`,
     },
   ]);
+  // Passwords are never saved, and there is no token to save.
+  const [stored] = await rawShelves();
+  expect(stored).toEqual({
+    url: 'https://a.example/opds',
+    connectionUrl: 'https://a.example/opds',
+    username: 'reader',
+    title: 'Library',
+  });
 });

@@ -4,6 +4,7 @@
   import { isDesktop, watchNativeFiles } from './lib/desktop';
   import { registerSW } from 'virtual:pwa-register';
   import BookCard from './components/BookCard.svelte';
+  import ConfirmDialog from './components/ConfirmDialog.svelte';
   import Catalogue from './components/Catalogue.svelte';
   import Calibre from './components/Calibre.svelte';
   import Reader from './components/Reader.svelte';
@@ -38,6 +39,7 @@
     showInfo = false,
     storage = '';
   let importing: AbortController | undefined,
+    removing: Book | undefined,
     installPrompt: any,
     updateReady = false,
     updateApp: ((reload?: boolean) => Promise<void>) | undefined;
@@ -211,12 +213,10 @@
     await refresh();
   }
   async function remove(book: Book) {
-    if (
-      !confirm(
-        `Remove “${book.title}” and its local notes and reading position from this device? Your original file is unchanged.`,
-      )
-    )
-      return;
+    removing = book;
+  }
+  async function confirmRemove(book: Book) {
+    removing = undefined;
     await deleteBook(book.id);
     await refresh();
   }
@@ -494,6 +494,15 @@
             </nav>{/if}{/if}
       {/if}
     </main>
+    {#if removing}<ConfirmDialog
+        message={`Remove “${removing.title}” and its local notes and reading position from this device? Your original file is unchanged.`}
+        confirmLabel="Remove"
+        onconfirm={() => {
+          const book = removing;
+          if (book) confirmRemove(book).catch((e) => (error = e.message));
+        }}
+        oncancel={() => (removing = undefined)}
+      />{/if}
     <footer class="app-footer">
       <span>SKRIVIST BOOKS</span><span>Read slowly. Keep it local.</span><a
         href="https://comics.skriv.ist"

@@ -2,6 +2,7 @@
   import { isDesktop, openExternal } from '../lib/desktop';
   import { onMount, tick } from 'svelte';
   import { ankiCsv } from '../lib/anki';
+  import ConfirmDialog from './ConfirmDialog.svelte';
   import type { Book } from '../lib/store';
   import {
     listNotes,
@@ -20,6 +21,7 @@
   let notes: ReadingNote[] = [],
     dialog: HTMLDialogElement,
     editing: ReadingNote | undefined,
+    deleting: ReadingNote | undefined,
     quote = '',
     text = '',
     error = '',
@@ -127,9 +129,11 @@
         'Anki file downloaded. In Anki, choose File → Import, select this CSV, and use a two-field Basic note type (Front / Back).';
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  async function remove(note: ReadingNote) {
-    if (!confirm('Delete this local note? Any copy in Obsidian will remain.'))
-      return;
+  function remove(note: ReadingNote) {
+    deleting = note;
+  }
+  async function confirmRemove(note: ReadingNote) {
+    deleting = undefined;
     try {
       await removeNote(note.id);
       if (editing?.id === note.id) editing = undefined;
@@ -295,3 +299,12 @@
     selectable quotations.
   </p>
 </dialog>
+{#if deleting}<ConfirmDialog
+    message="Delete this local note? Any copy in Obsidian will remain."
+    confirmLabel="Delete"
+    onconfirm={() => {
+      const note = deleting;
+      if (note) confirmRemove(note);
+    }}
+    oncancel={() => (deleting = undefined)}
+  />{/if}

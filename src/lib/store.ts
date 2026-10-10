@@ -34,7 +34,8 @@ export interface Shelf {
 }
 let opening: Promise<IDBDatabase> | undefined;
 export function db(): Promise<IDBDatabase> {
-  if (isDesktop()) return Promise.reject(new Error('Desktop libraries use native storage.'));
+  if (isDesktop())
+    return Promise.reject(new Error('Desktop libraries use native storage.'));
   return (opening ??= new Promise((resolve, reject) => {
     const req = indexedDB.open('skrivist-books', 2);
     req.onupgradeneeded = () => {
@@ -103,6 +104,17 @@ const sameRemote = (a: Remote, b: Remote) =>
   a.feedUrl === b.feedUrl &&
   a.connectionUrl === b.connectionUrl;
 async function scrubRemotes(ids: string[]) {
+  if (isDesktop()) {
+    for (const id of ids) {
+      const book = await getBook(id);
+      if (book?.remote)
+        await native('books_update', {
+          id,
+          changes: { remote: plainRemote(book.remote) },
+        });
+    }
+    return;
+  }
   const d = await db(),
     tx = d.transaction('books', 'readwrite'),
     finished = done(tx),
@@ -118,11 +130,11 @@ async function scrubRemotes(ids: string[]) {
   await finished;
 }
 export async function listBooks(): Promise<Book[]> {
-  if (isDesktop()) return native('list', { store: 'books' });
-  const d = await db();
-  const books: Book[] = await request(
-    d.transaction('books').objectStore('books').getAll(),
-  );
+  const books: Book[] = isDesktop()
+    ? await native('list', { store: 'books' })
+    : await request(
+        (await db()).transaction('books').objectStore('books').getAll(),
+      );
   const legacy: Book[] = [];
   const result = books.map((book) => {
     if (!book.remote) return book;
@@ -213,18 +225,20 @@ export async function deleteBook(id: string) {
     tx.objectStore(name).delete(id);
   await finished;
 }
+const shelfRecord = (shelf: Shelf): Shelf => ({
+  url: shelf.url,
+  title: shelf.title,
+  username: shelf.username,
+  connectionUrl: shelf.connectionUrl,
+  ...(shelf.token ? { token: shelf.token } : {}),
+});
 export async function saveShelf(shelf: Shelf) {
-  if (isDesktop()) return native('put', { store: 'shelves', value: { url: shelf.url, title: shelf.title, username: shelf.username, connectionUrl: shelf.connectionUrl } });
+  if (isDesktop())
+    return native('put', { store: 'shelves', value: shelfRecord(shelf) });
   const d = await db(),
     tx = d.transaction('shelves', 'readwrite'),
     finished = done(tx);
-  tx.objectStore('shelves').put({
-    url: shelf.url,
-    title: shelf.title,
-    username: shelf.username,
-    connectionUrl: shelf.connectionUrl,
-    ...(shelf.token ? { token: shelf.token } : {}),
-  });
+  tx.objectStore('shelves').put(shelfRecord(shelf));
   await finished;
 }
 // A shelf saved before tokens had a field of their own carries its token inside
@@ -248,8 +262,36 @@ function plainShelf(shelf: Shelf): Shelf {
     return shelf;
   }
 }
+// Legacy shelves rewritten to plain URLs; shelves that become the same one merge,
+// keeping a token. Pure: the stored records are not modified.
+function planShelves(stored: Shelf[]): { result: Shelf[]; changed: boolean } {
+  const plain = new Map<string, Shelf>();
+  let changed = false;
+  for (const shelf of stored) {
+    const next = plainShelf(shelf);
+    if (next.url !== shelf.url || next.connectionUrl !== shelf.connectionUrl)
+      changed = true;
+    const same = plain.get(next.url);
+    if (!same) plain.set(next.url, next);
+    else if (!same.token && next.token)
+      plain.set(next.url, { ...same, token: next.token });
+  }
+  return { result: [...plain.values()], changed };
+}
 export async function shelves(): Promise<Shelf[]> {
-  if (isDesktop()) return native('list', { store: 'shelves' });
+  if (isDesktop()) {
+    const stored: Shelf[] = await native('list', { store: 'shelves' });
+    const { result, changed } = planShelves(stored);
+    if (!changed) return result;
+    // Native storage has no multi-record transaction: write the plain shelves
+    // first and drop the legacy rows last, so an interrupted rewrite loses nothing.
+    for (const shelf of result)
+      await native('put', { store: 'shelves', value: shelfRecord(shelf) });
+    for (const shelf of stored)
+      if (!result.some((kept) => kept.url === shelf.url))
+        await native('delete', { store: 'shelves', key: shelf.url });
+    return result;
+  }
   // One read-write transaction: rewriting old records must not race a save.
   const d = await db(),
     tx = d.transaction('shelves', 'readwrite'),
@@ -259,18 +301,9 @@ export async function shelves(): Promise<Shelf[]> {
   let result: Shelf[] = [];
   req.onsuccess = () => {
     const stored: Shelf[] = req.result;
-    const plain = new Map<string, Shelf>();
-    let changed = false;
-    for (const shelf of stored) {
-      const next = plainShelf(shelf);
-      if (next.url !== shelf.url || next.connectionUrl !== shelf.connectionUrl)
-        changed = true;
-      const same = plain.get(next.url);
-      if (!same) plain.set(next.url, next);
-      else if (!same.token && next.token) same.token = next.token;
-    }
-    result = [...plain.values()];
-    if (!changed) return;
+    const plan = planShelves(stored);
+    result = plan.result;
+    if (!plan.changed) return;
     for (const shelf of stored) store.delete(shelf.url);
     for (const shelf of result) store.put(shelf);
   };

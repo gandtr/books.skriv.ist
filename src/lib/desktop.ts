@@ -103,3 +103,7 @@ export async function watchNativeFiles(
   drain();
   return () => { stopped = true; stop(); };
 }
+/** The desktop host's verdict on the next export: saved, or refused or cancelled. */
+export function onDownloadResult(callback: (saved: boolean) => void): void {
+  window.addEventListener('skrivist-download-result', event => callback((event as CustomEvent<{ success?: unknown } | null>).detail?.success === true), { once: true });
+}

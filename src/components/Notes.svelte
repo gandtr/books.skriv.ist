@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isDesktop, openExternal } from '../lib/desktop';
+  import { isDesktop, onDownloadResult, openExternal } from '../lib/desktop';
   import { onMount, tick } from 'svelte';
   import { ankiCsv } from '../lib/anki';
   import ConfirmDialog from './ConfirmDialog.svelte';
@@ -124,9 +124,16 @@
         ' - notes.md';
     if (anki) a.download = a.download.replace(/\.md$/, ' - Anki.csv');
     a.click();
-    if (anki)
-      notice =
-        'Anki file downloaded. In Anki, choose File → Import, select this CSV, and use a two-field Basic note type (Front / Back).';
+    const saved = anki
+      ? 'Anki file downloaded. In Anki, choose File → Import, select this CSV, and use a two-field Basic note type (Front / Back).'
+      : '';
+    // The desktop app asks where to save and can refuse or be cancelled: wait for its answer.
+    if (isDesktop()) {
+      notice = 'Saving the export…';
+      onDownloadResult((ok) => {
+        notice = ok ? saved || 'Notes exported.' : 'The export was not saved.';
+      });
+    } else if (saved) notice = saved;
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   function remove(note: ReadingNote) {

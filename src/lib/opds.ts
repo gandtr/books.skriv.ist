@@ -1,4 +1,5 @@
 /** OPDS 1 (Atom) and OPDS 2. Feed markup is never rendered as HTML. */
+import { anySignal } from './abort';
 export interface Link {
   href: string;
   title: string;
@@ -275,9 +276,7 @@ export async function fetchLimited(
       'This HTTPS reader needs an HTTPS catalogue. Use the local app for an HTTP server.',
     );
   const idle = new AbortController();
-  const combined = signal
-    ? AbortSignal.any([signal, idle.signal])
-    : idle.signal;
+  const combined = signal ? anySignal([signal, idle.signal]) : idle.signal;
   let timer: ReturnType<typeof setTimeout>;
   const reset = () => {
     clearTimeout(timer);

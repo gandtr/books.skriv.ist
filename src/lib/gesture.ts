@@ -137,17 +137,21 @@ export function selectedRange(
   if (!selection) return undefined;
   const composed = (
     selection as Selection & {
-      getComposedRanges?: (o: { shadowRoots: ShadowRoot[] }) => StaticRange[];
+      getComposedRanges?: (...roots: unknown[]) => StaticRange[];
     }
   ).getComposedRanges;
   if (composed && root) {
-    try {
-      const range = composed
-        .call(selection, { shadowRoots: [root] })
-        .find((r) => !r.collapsed);
-      if (range) return range;
-    } catch {
-      // Older engines take positional shadow roots or none; fall through.
+    // The dictionary form first; earlier WebKit takes the shadow roots positionally.
+    for (const argument of [{ shadowRoots: [root] }, root]) {
+      try {
+        const range = composed
+          .call(selection, argument)
+          .find((r) => !r.collapsed);
+        if (range) return range;
+        break;
+      } catch {
+        // Try the other signature, then fall through to the ordinary range.
+      }
     }
   }
   return !selection.isCollapsed && selection.rangeCount

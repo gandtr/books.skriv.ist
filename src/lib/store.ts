@@ -291,16 +291,20 @@ export async function shelves(): Promise<Shelf[]> {
     // first and drop the legacy rows last, so an interrupted rewrite loses nothing.
     for (const shelf of result)
       await native('put', { store: 'shelves', value: shelfRecord(shelf) });
-    // A native library that predates the token field drops it: keep the legacy
-    // rows, which still carry their tokens, unless every token was stored.
+    // A native library that predates the token field drops it: a legacy row is
+    // deleted only once the token of the shelf it became reads back.
+    const verified = new Set<string>();
     for (const shelf of result)
       if (
-        shelf.token &&
-        (await nativeGet<Shelf>('shelves', shelf.url))?.token !== shelf.token
+        !shelf.token ||
+        (await nativeGet<Shelf>('shelves', shelf.url))?.token === shelf.token
       )
-        return result;
+        verified.add(shelf.url);
     for (const shelf of stored)
-      if (!result.some((kept) => kept.url === shelf.url))
+      if (
+        !result.some((kept) => kept.url === shelf.url) &&
+        verified.has(plainShelf(shelf).url)
+      )
         await native('delete', { store: 'shelves', key: shelf.url });
     return result;
   }
@@ -323,7 +327,14 @@ export async function shelves(): Promise<Shelf[]> {
   return result;
 }
 export async function forgetShelf(url: string) {
-  if (isDesktop()) return native('delete', { store: 'shelves', key: url });
+  if (isDesktop()) {
+    // Also any legacy row that becomes this shelf (kept until its token was stored).
+    const stored: Shelf[] = await native('list', { store: 'shelves' });
+    for (const shelf of stored)
+      if (shelf.url === url || plainShelf(shelf).url === url)
+        await native('delete', { store: 'shelves', key: shelf.url });
+    return;
+  }
   const d = await db(),
     tx = d.transaction('shelves', 'readwrite'),
     finished = done(tx);

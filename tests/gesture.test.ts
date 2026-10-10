@@ -177,3 +177,28 @@ it('falls back to the ordinary range when getComposedRanges throws or is missing
   expect(selectedRange(null)).toBeUndefined();
   host.remove();
 });
+
+it('tries the positional getComposedRanges(root) of earlier WebKit when the dictionary form throws', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = host.attachShadow({ mode: 'open' });
+  const text = document.createTextNode('Earlier WebKit');
+  root.append(text);
+  const composed = {
+    startContainer: text,
+    startOffset: 0,
+    endContainer: text,
+    endOffset: 7,
+    collapsed: false,
+  };
+  const selection = {
+    isCollapsed: true,
+    rangeCount: 0,
+    getComposedRanges: (arg: unknown) => {
+      if (arg !== root) throw new TypeError('Argument 1 is not a ShadowRoot');
+      return [composed];
+    },
+  } as unknown as Selection;
+  expect(rangeText(selectedRange(selection, root)!)).toBe('Earlier');
+  host.remove();
+});

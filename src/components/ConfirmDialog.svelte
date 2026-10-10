@@ -30,7 +30,10 @@
 >
   <p id="confirm-message">{message}</p>
   <div class="confirm-actions">
-    <button class="secondary" onclick={() => settle(false)}>Cancel</button>
+    <!-- svelte-ignore a11y_autofocus -->
+    <button class="secondary" autofocus onclick={() => settle(false)}
+      >Cancel</button
+    >
     <button class="confirm-action" onclick={() => settle(true)}
       >{confirmLabel}</button
     >

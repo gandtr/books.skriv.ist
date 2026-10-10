@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import {
+  forgetShelf,
   getBook,
   listBooks,
   saveShelf,
@@ -189,4 +190,65 @@ it('returns a plain remote from getBook, as listBooks does', async () => {
     connectionUrl: PLAIN,
     username: '',
   });
+});
+it('forgets a shelf together with a legacy row kept for its token', async () => {
+  const stored: Shelf[] = [
+    { url: LEGACY, title: 'Old', username: '', connectionUrl: LEGACY },
+    { url: PLAIN, title: 'Old', username: '', connectionUrl: PLAIN },
+    {
+      url: 'https://b.example/opds/v1.2/catalog',
+      title: 'Other',
+      username: '',
+      connectionUrl: 'https://b.example/opds/v1.2/catalog',
+    },
+  ];
+  ipc.mockImplementation(async (_command, args: any) =>
+    args.action === 'list' ? stored : null,
+  );
+  await forgetShelf(PLAIN);
+  expect(
+    calls()
+      .filter((call) => call.action === 'delete')
+      .map((call) => call.args.key)
+      .sort(),
+  ).toEqual([LEGACY, PLAIN].sort());
+});
+it('drops the legacy rows of shelves whose token was stored, and keeps only the others', async () => {
+  const OTHER_LEGACY = 'https://b.example/opds/t/tok_b/v1.2/catalog';
+  const OTHER_PLAIN = 'https://b.example/opds/v1.2/catalog';
+  const stored: Shelf[] = [
+    { url: LEGACY, title: 'A', username: '', connectionUrl: LEGACY },
+    {
+      url: OTHER_LEGACY,
+      title: 'B',
+      username: '',
+      connectionUrl: OTHER_LEGACY,
+    },
+  ];
+  ipc.mockImplementation(async (_command, args: any) => {
+    if (args.action === 'list') return stored;
+    // a.example's token reads back; b.example's was dropped.
+    if (args.action === 'get')
+      return args.args.key === PLAIN
+        ? {
+            url: PLAIN,
+            title: 'A',
+            username: '',
+            connectionUrl: PLAIN,
+            token: 'tok_en',
+          }
+        : {
+            url: OTHER_PLAIN,
+            title: 'B',
+            username: '',
+            connectionUrl: OTHER_PLAIN,
+          };
+    return null;
+  });
+  await shelves();
+  expect(
+    calls()
+      .filter((call) => call.action === 'delete')
+      .map((call) => call.args.key),
+  ).toEqual([LEGACY]);
 });

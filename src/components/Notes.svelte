@@ -123,17 +123,22 @@
       : book.title.replace(/[^\p{L}\p{N} _-]/gu, '').slice(0, 70) +
         ' - notes.md';
     if (anki) a.download = a.download.replace(/\.md$/, ' - Anki.csv');
-    a.click();
     const saved = anki
       ? 'Anki file downloaded. In Anki, choose File → Import, select this CSV, and use a two-field Basic note type (Front / Back).'
       : '';
-    // The desktop app asks where to save and can refuse or be cancelled: wait for its answer.
+    // The desktop app asks where to save and can refuse or be cancelled: listen
+    // before clicking, and keep the file until the app has answered.
     if (isDesktop()) {
       notice = 'Saving the export…';
       onDownloadResult((ok) => {
         notice = ok ? saved || 'Notes exported.' : 'The export was not saved.';
+        URL.revokeObjectURL(url);
       });
-    } else if (saved) notice = saved;
+      a.click();
+      return;
+    }
+    a.click();
+    if (saved) notice = saved;
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   function remove(note: ReadingNote) {

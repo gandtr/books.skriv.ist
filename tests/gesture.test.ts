@@ -1,8 +1,22 @@
 import { expect, it } from 'vitest';
-import { hasSelection, pageGesture, PageGestureTracker } from '../src/lib/gesture';
+import {
+  hasSelection,
+  pageGesture,
+  PageGestureTracker,
+  rangeText,
+  selectedRange,
+} from '../src/lib/gesture';
 
 const W = 400; // page width
-const base = { width: W, startX: 200, endX: 200, dy: 0, ms: 150, selecting: false, onLink: false };
+const base = {
+  width: W,
+  startX: 200,
+  endX: 200,
+  dy: 0,
+  ms: 150,
+  selecting: false,
+  onLink: false,
+};
 
 it('turns forward on a left swipe and back on a right swipe', () => {
   expect(pageGesture({ ...base, startX: 300, endX: 220 })).toBe(1);
@@ -23,14 +37,40 @@ it('turns on a tap in the outer fifth of the page', () => {
 
 it('leaves taps alone when they are long presses, on links, or selecting text', () => {
   expect(pageGesture({ ...base, startX: 390, endX: 390, ms: 700 })).toBe(0);
-  expect(pageGesture({ ...base, startX: 390, endX: 390, onLink: true })).toBe(0);
-  expect(pageGesture({ ...base, startX: 390, endX: 390, selecting: true })).toBe(0);
-  expect(pageGesture({ ...base, startX: 300, endX: 220, selecting: true })).toBe(0);
+  expect(pageGesture({ ...base, startX: 390, endX: 390, onLink: true })).toBe(
+    0,
+  );
+  expect(
+    pageGesture({ ...base, startX: 390, endX: 390, selecting: true }),
+  ).toBe(0);
+  expect(
+    pageGesture({ ...base, startX: 300, endX: 220, selecting: true }),
+  ).toBe(0);
 });
 
-const down = (id: number, x: number, more: Partial<Parameters<PageGestureTracker['down']>[0]> = {}) =>
-  ({ id, x, y: 300, t: 0, primary: id === 1, type: 'touch', onLink: false, ...more });
-const up = (id: number, x: number, t = 150) => ({ id, x, y: 300, t, left: 0, width: W, selecting: false });
+const down = (
+  id: number,
+  x: number,
+  more: Partial<Parameters<PageGestureTracker['down']>[0]> = {},
+) => ({
+  id,
+  x,
+  y: 300,
+  t: 0,
+  primary: id === 1,
+  type: 'touch',
+  onLink: false,
+  ...more,
+});
+const up = (id: number, x: number, t = 150) => ({
+  id,
+  x,
+  y: 300,
+  t,
+  left: 0,
+  width: W,
+  selecting: false,
+});
 
 it('the tracker turns on a single-finger swipe or edge tap', () => {
   const g = new PageGestureTracker();
@@ -72,7 +112,68 @@ it('sees a selection inside a shadow root even when Selection reports it collaps
     getComposedRanges: () => [{ collapsed: false }],
   } as unknown as Selection;
   expect(hasSelection(collapsedButComposed, root)).toBe(true);
-  expect(hasSelection({ isCollapsed: true, getComposedRanges: () => [{ collapsed: true }] } as unknown as Selection, root)).toBe(false);
+  expect(
+    hasSelection(
+      {
+        isCollapsed: true,
+        getComposedRanges: () => [{ collapsed: true }],
+      } as unknown as Selection,
+      root,
+    ),
+  ).toBe(false);
   expect(hasSelection({ isCollapsed: false } as Selection, root)).toBe(true);
   expect(hasSelection(null, root)).toBe(false);
+});
+
+it('returns the composed range of a shadow-root selection that WebKit reports as collapsed', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = host.attachShadow({ mode: 'open' });
+  const text = document.createTextNode('The quoted passage, and more.');
+  root.append(text);
+  const composed = {
+    startContainer: text,
+    startOffset: 4,
+    endContainer: text,
+    endOffset: 18,
+    collapsed: false,
+  };
+  const selection = {
+    isCollapsed: true,
+    rangeCount: 0,
+    getComposedRanges: () => [composed],
+  } as unknown as Selection;
+  const range = selectedRange(selection, root);
+  expect(range).toBe(composed);
+  expect(rangeText(range!)).toBe('quoted passage');
+  host.remove();
+});
+
+it('falls back to the ordinary range when getComposedRanges throws or is missing', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  host.textContent = 'Light DOM text';
+  const ordinary = document.createRange();
+  ordinary.setStart(host.firstChild!, 0);
+  ordinary.setEnd(host.firstChild!, 5);
+  const throwing = {
+    isCollapsed: false,
+    rangeCount: 1,
+    getRangeAt: () => ordinary,
+    getComposedRanges: () => {
+      throw new TypeError('positional shadow roots');
+    },
+  } as unknown as Selection;
+  expect(selectedRange(throwing, {} as ShadowRoot)).toBe(ordinary);
+  const plain = {
+    isCollapsed: false,
+    rangeCount: 1,
+    getRangeAt: () => ordinary,
+  } as unknown as Selection;
+  expect(rangeText(selectedRange(plain)!)).toBe('Light');
+  expect(
+    selectedRange({ isCollapsed: true, rangeCount: 0 } as unknown as Selection),
+  ).toBeUndefined();
+  expect(selectedRange(null)).toBeUndefined();
+  host.remove();
 });

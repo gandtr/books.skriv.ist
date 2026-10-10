@@ -22,9 +22,18 @@ const EDGE = 0.2;
 export function pageGesture(g: PageGesture): -1 | 0 | 1 {
   if (g.selecting) return 0;
   const dx = g.endX - g.startX;
-  if (Math.abs(dx) >= SWIPE_PX && Math.abs(dx) > 1.5 * Math.abs(g.dy) && g.ms <= SWIPE_MS)
+  if (
+    Math.abs(dx) >= SWIPE_PX &&
+    Math.abs(dx) > 1.5 * Math.abs(g.dy) &&
+    g.ms <= SWIPE_MS
+  )
     return dx < 0 ? 1 : -1;
-  if (Math.abs(dx) <= TAP_PX && Math.abs(g.dy) <= TAP_PX && g.ms <= TAP_MS && !g.onLink) {
+  if (
+    Math.abs(dx) <= TAP_PX &&
+    Math.abs(g.dy) <= TAP_PX &&
+    g.ms <= TAP_MS &&
+    !g.onLink
+  ) {
     if (g.startX < g.width * EDGE) return -1;
     if (g.startX > g.width * (1 - EDGE)) return 1;
   }
@@ -92,19 +101,64 @@ export class PageGestureTracker {
 
 /** Whether text is selected, including inside a shadow root, where WebKit reports
  *  the Selection as collapsed and only getComposedRanges() sees it. */
-export function hasSelection(selection: Selection | null, root?: ShadowRoot): boolean {
+export function hasSelection(
+  selection: Selection | null,
+  root?: ShadowRoot,
+): boolean {
   if (!selection) return false;
   const composed = (
     selection as Selection & {
-      getComposedRanges?: (o: { shadowRoots: ShadowRoot[] }) => { collapsed: boolean }[];
+      getComposedRanges?: (o: {
+        shadowRoots: ShadowRoot[];
+      }) => { collapsed: boolean }[];
     }
   ).getComposedRanges;
   if (composed && root) {
     try {
-      if (composed.call(selection, { shadowRoots: [root] }).some((r) => !r.collapsed)) return true;
+      if (
+        composed
+          .call(selection, { shadowRoots: [root] })
+          .some((r) => !r.collapsed)
+      )
+        return true;
     } catch {
       // Older engines take positional shadow roots or none; fall through.
     }
   }
   return !selection.isCollapsed;
+}
+
+/** The selected range, including inside a shadow root, where WebKit reports the
+ *  Selection as collapsed and only getComposedRanges() sees it. */
+export function selectedRange(
+  selection: Selection | null,
+  root?: ShadowRoot,
+): AbstractRange | undefined {
+  if (!selection) return undefined;
+  const composed = (
+    selection as Selection & {
+      getComposedRanges?: (o: { shadowRoots: ShadowRoot[] }) => StaticRange[];
+    }
+  ).getComposedRanges;
+  if (composed && root) {
+    try {
+      const range = composed
+        .call(selection, { shadowRoots: [root] })
+        .find((r) => !r.collapsed);
+      if (range) return range;
+    } catch {
+      // Older engines take positional shadow roots or none; fall through.
+    }
+  }
+  return !selection.isCollapsed && selection.rangeCount
+    ? selection.getRangeAt(0)
+    : undefined;
+}
+
+/** The text of a live or static range. */
+export function rangeText(range: AbstractRange): string {
+  const live = document.createRange();
+  live.setStart(range.startContainer, range.startOffset);
+  live.setEnd(range.endContainer, range.endOffset);
+  return live.toString();
 }

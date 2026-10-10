@@ -23,7 +23,12 @@
   import type { ReadingNote } from '../lib/notes';
   import type { Position } from '../lib/store';
   import { Epub } from '../lib/epub';
-  import { hasSelection, PageGestureTracker } from '../lib/gesture';
+  import {
+    hasSelection,
+    PageGestureTracker,
+    rangeText,
+    selectedRange,
+  } from '../lib/gesture';
   import { getFile, updateBook, type Book } from '../lib/store';
   export let book: Book;
   export let initialPosition: Position | undefined = undefined;
@@ -389,14 +394,19 @@
       (
         root as ShadowRoot & { getSelection?: () => Selection | null }
       )?.getSelection?.() || window.getSelection();
-    if (!selection || selection.isCollapsed || !selection.rangeCount) return;
-    const range = selection.getRangeAt(0);
+    const range = selectedRange(selection, root);
+    if (!range) return;
     const area = book.format === 'epub' ? content : pdfText;
     if (
       area?.contains(range.startContainer) &&
       area.contains(range.endContainer)
-    )
-      selectedQuote = selection.toString().trim();
+    ) {
+      // Selection text keeps paragraph breaks; WebKit reports a shadow-root
+      // selection as collapsed, so only the composed range has its text there.
+      selectedQuote = (
+        selection!.isCollapsed ? rangeText(range) : selection!.toString()
+      ).trim();
+    }
   }
   function captureNote() {
     captureSelection();

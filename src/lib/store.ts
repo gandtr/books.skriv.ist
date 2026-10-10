@@ -147,9 +147,13 @@ export async function listBooks(): Promise<Book[]> {
   return result;
 }
 export async function getBook(id: string): Promise<Book | undefined> {
-  if (isDesktop()) return nativeGet('books', id);
-  const d = await db();
-  return request(d.transaction('books').objectStore('books').get(id));
+  const book: Book | undefined = isDesktop()
+    ? await nativeGet('books', id)
+    : await request(
+        (await db()).transaction('books').objectStore('books').get(id),
+      );
+  // listBooks() rewrites stored remotes; a book opened by link may be read first.
+  return book?.remote ? { ...book, remote: plainRemote(book.remote) } : book;
 }
 export async function getFile(id: string): Promise<Blob | undefined> {
   if (isDesktop()) return nativeGet('files', id);
@@ -287,6 +291,14 @@ export async function shelves(): Promise<Shelf[]> {
     // first and drop the legacy rows last, so an interrupted rewrite loses nothing.
     for (const shelf of result)
       await native('put', { store: 'shelves', value: shelfRecord(shelf) });
+    // A native library that predates the token field drops it: keep the legacy
+    // rows, which still carry their tokens, unless every token was stored.
+    for (const shelf of result)
+      if (
+        shelf.token &&
+        (await nativeGet<Shelf>('shelves', shelf.url))?.token !== shelf.token
+      )
+        return result;
     for (const shelf of stored)
       if (!result.some((kept) => kept.url === shelf.url))
         await native('delete', { store: 'shelves', key: shelf.url });

@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import {
+  getBook,
   listBooks,
   saveShelf,
   shelves,
@@ -55,9 +56,6 @@ it('moves a legacy token out of shelf URLs: the plain shelf is written before th
     username: '',
     connectionUrl: LEGACY,
   };
-  ipc.mockImplementation(async (_command, args: any) =>
-    args.action === 'list' ? [legacy] : null,
-  );
   const expected = {
     url: PLAIN,
     title: 'Old',
@@ -65,8 +63,13 @@ it('moves a legacy token out of shelf URLs: the plain shelf is written before th
     connectionUrl: PLAIN,
     token: 'tok_en',
   };
+  ipc.mockImplementation(async (_command, args: any) =>
+    args.action === 'list' ? [legacy] : args.action === 'get' ? expected : null,
+  );
   expect(await shelves()).toEqual([expected]);
-  const writes = calls().filter((call) => call.action !== 'list');
+  const writes = calls().filter(
+    (call) => call.action !== 'list' && call.action !== 'get',
+  );
   expect(writes).toEqual([
     { action: 'put', args: { store: 'shelves', value: expected } },
     { action: 'delete', args: { store: 'shelves', key: LEGACY } },
@@ -84,7 +87,17 @@ it('merges a legacy shelf into the plain shelf it becomes, keeping the token', a
     { url: PLAIN, title: 'New', username: '', connectionUrl: PLAIN },
   ];
   ipc.mockImplementation(async (_command, args: any) =>
-    args.action === 'list' ? stored : null,
+    args.action === 'list'
+      ? stored
+      : args.action === 'get'
+        ? {
+            url: PLAIN,
+            title: 'Old',
+            username: '',
+            connectionUrl: PLAIN,
+            token: 'tok_en',
+          }
+        : null,
   );
   const result = await shelves();
   expect(result).toHaveLength(1);
@@ -138,5 +151,42 @@ it('rewrites a legacy book remote through books_update and lists the plain remot
   expect(calls().find((call) => call.action === 'books_update')).toEqual({
     action: 'books_update',
     args: { id: 'b1', changes: { remote: plain } },
+  });
+});
+it('keeps the legacy shelf when the native library did not store the token', async () => {
+  const legacy: Shelf = {
+    url: LEGACY,
+    title: 'Old',
+    username: '',
+    connectionUrl: LEGACY,
+  };
+  // An older runtime drops fields it does not know, such as token.
+  ipc.mockImplementation(async (_command, args: any) => {
+    if (args.action === 'list') return [legacy];
+    if (args.action === 'get')
+      return { url: PLAIN, title: 'Old', username: '', connectionUrl: PLAIN };
+    return null;
+  });
+  const [shelf] = await shelves();
+  expect(shelf).toMatchObject({ url: PLAIN, token: 'tok_en' });
+  expect(calls().some((call) => call.action === 'delete')).toBe(false);
+});
+it('returns a plain remote from getBook, as listBooks does', async () => {
+  const book = {
+    id: 'b1',
+    title: 'B',
+    remote: {
+      href: 'https://a.example/opds/t/tok_en/v1.2/items/1/file',
+      feedUrl: LEGACY,
+      connectionUrl: LEGACY,
+      username: '',
+    },
+  };
+  ipc.mockResolvedValue(book);
+  expect((await getBook('b1'))?.remote).toEqual({
+    href: 'https://a.example/opds/v1.2/items/1/file',
+    feedUrl: PLAIN,
+    connectionUrl: PLAIN,
+    username: '',
   });
 });

@@ -58,9 +58,13 @@ afterEach(() => {
   target.remove();
 });
 
+// Several timer turns, not one: fake-indexeddb and the mocked fetch each queue
+// macrotasks, and a single 20 ms wait flaked when the suite ran under load.
 const settle = async () => {
-  for (let i = 0; i < 5; i++) await tick();
-  await new Promise((r) => setTimeout(r, 20));
+  for (let i = 0; i < 5; i++) {
+    await tick();
+    await new Promise((r) => setTimeout(r, 20));
+  }
 };
 const mountCatalogue = (url = PAIRED) => {
   app = mount(Catalogue, {

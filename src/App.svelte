@@ -337,6 +337,8 @@
             <a href="https://skriv.ist/" target="_blank" rel="noopener noreferrer">skriv.ist ↗</a>
             <a href="https://gand.tr/" target="_blank" rel="noopener noreferrer">gand.tr ↗</a>
             <a href="https://c0ze.github.io/armarium/" target="_blank" rel="noopener noreferrer">Armarium project ↗</a>
+            <a href="https://skriv.ist/privacy" target="_blank" rel="noopener noreferrer">Privacy ↗</a>
+            <a href="https://skriv.ist/support" target="_blank" rel="noopener noreferrer">Support ↗</a>
             {#if !isDesktop()}<button
               class="secondary"
               onclick={async () => {
@@ -513,6 +515,8 @@
         <a href="https://skriv.ist/" target="_blank" rel="noopener noreferrer">skriv.ist ↗</a>
         <a href="https://gand.tr/" target="_blank" rel="noopener noreferrer">gand.tr ↗</a>
         <a href="https://c0ze.github.io/armarium/" target="_blank" rel="noopener noreferrer">Armarium project ↗</a>
+        <a href="https://skriv.ist/privacy" target="_blank" rel="noopener noreferrer">Privacy ↗</a>
+        <a href="https://skriv.ist/support" target="_blank" rel="noopener noreferrer">Support ↗</a>
       </nav>
     </footer>
   </div>

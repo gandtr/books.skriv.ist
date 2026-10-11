@@ -16,15 +16,8 @@
     type Entry,
     type Link,
   } from '../lib/opds';
-  import {
-    saveShelf,
-    shelves,
-    forgetShelf,
-    listBooks,
-    getFile,
-    type Shelf,
-    type Book,
-  } from '../lib/store';
+  import { listBooks, getFile, type Book } from '../lib/store';
+  import { saveShelf, shelves, forgetShelf, type Shelf } from '../lib/shelves';
   import { importBook } from '../lib/import';
   export let onread: (book: Book) => void;
   export let onadded: () => void;

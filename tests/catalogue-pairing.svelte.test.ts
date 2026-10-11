@@ -13,7 +13,7 @@ vi.mock('../src/lib/opds', async (actual) => ({
 }));
 
 import Catalogue from '../src/components/Catalogue.svelte';
-import { shelves } from '../src/lib/store';
+import { shelves } from '../src/lib/shelves';
 
 const A = 'https://a.example/opds/t/aaa/v1.2/catalog';
 const B = 'https://b.example/opds/t/bbb/v1.2/catalog';

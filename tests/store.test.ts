@@ -8,10 +8,8 @@ import {
   addBook,
   updateBook,
   deleteBook,
-  saveShelf,
-  shelves,
-  forgetShelf,
 } from '../src/lib/store';
+import { saveShelf, shelves, forgetShelf } from '../src/lib/shelves';
 import { importBook } from '../src/lib/import';
 import { epubFile } from './fixtures';
 beforeEach(async () => {

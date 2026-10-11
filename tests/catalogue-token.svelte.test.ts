@@ -1,7 +1,8 @@
 import { flushSync, mount, tick, unmount } from 'svelte';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import Catalogue from '../src/components/Catalogue.svelte';
-import { db, shelves, forgetShelf } from '../src/lib/store';
+import { db } from '../src/lib/store';
+import { shelves, forgetShelf } from '../src/lib/shelves';
 import { forgetConnection, savedConnection } from '../src/lib/opds';
 
 const TOKEN = 'tok_en-123';

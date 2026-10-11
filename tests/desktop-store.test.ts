@@ -1,15 +1,13 @@
 // @vitest-environment node
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
+import { getBook, listBooks, type Book } from '../src/lib/store';
 import {
   forgetShelf,
-  getBook,
-  listBooks,
   saveShelf,
   shelves,
-  type Book,
   type Shelf,
-} from '../src/lib/store';
+} from '../src/lib/shelves';
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 const ipc = vi.mocked(invoke);
 interface Call {

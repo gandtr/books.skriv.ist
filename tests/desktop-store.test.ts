@@ -297,3 +297,13 @@ it('drops the legacy rows of shelves whose token was stored, and keeps only the 
       .map((call) => call.args.key),
   ).toEqual([LEGACY]);
 });
+it('a pairing shelf saved with a username joins its connection in native storage too', async () => {
+  const rows = nativeShelves([
+    row(PLAIN, PLAIN, 'A'),
+    { ...row(SUB, PLAIN, 'A'), username: 'reader' },
+  ]);
+  await saveShelf(row(PLAIN, PLAIN, 'B'));
+  expect(rows.get(SUB)).toMatchObject({ username: '', token: 'B' });
+  await forgetShelf(PLAIN, { connectionUrl: PLAIN, username: '' });
+  expect([...rows.keys()]).toEqual([]);
+});

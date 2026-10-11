@@ -6,7 +6,7 @@ export function isDesktop(): boolean {
 }
 /** macOS asks before an app may reach the local network; a refusal looks like any network failure. */
 export function networkHint(): string {
-  return isDesktop() && /Macintosh/.test(navigator.userAgent) ? ' On a Mac, also allow Skrivist Books under System Settings › Privacy & Security › Local Network.' : '';
+  return isDesktop() && /Macintosh/.test(navigator.userAgent) ? ' On macOS 15 or later, also allow Skrivist Books under System Settings › Privacy & Security › Local Network.' : '';
 }
 interface StoredBlob { __skrivistBlob: string; size: number; mime: string }
 async function encode(value: unknown): Promise<unknown> {

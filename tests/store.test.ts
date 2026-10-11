@@ -316,3 +316,44 @@ it('forgetting a catalogue forgets the shelves saved from it; a sub-shelf alone 
   // Mine is the same catalogue under another login: another connection.
   expect((await shelves()).map((s) => s.url).sort()).toEqual([MINE, Q].sort());
 });
+it('a pairing shelf saved with a username by an older version joins its connection', async () => {
+  await rawPut('shelves', {
+    url: P,
+    connectionUrl: P,
+    username: '',
+    title: 'Library',
+    token: 'A',
+  });
+  await rawPut('shelves', {
+    url: SAGA,
+    connectionUrl: P,
+    username: 'reader',
+    title: 'Saga',
+    token: 'A',
+  });
+  await rawPut('shelves', {
+    url: MINE,
+    connectionUrl: P,
+    username: 'reader',
+    title: 'Mine',
+  });
+  const users = Object.fromEntries(
+    (await shelves()).map((s) => [s.url, s.username]),
+  );
+  expect(users).toEqual({ [P]: '', [SAGA]: '', [MINE]: 'reader' });
+  expect(
+    (await rawAll<{ url: string; username: string }>('shelves')).find(
+      (s) => s.url === SAGA,
+    )?.username,
+  ).toBe('');
+  await saveShelf({
+    url: P,
+    title: 'Library',
+    username: '',
+    connectionUrl: P,
+    token: 'B',
+  });
+  expect((await shelves()).find((s) => s.url === SAGA)?.token).toBe('B');
+  await forgetShelf(P, { connectionUrl: P, username: '' });
+  expect((await shelves()).map((s) => s.url)).toEqual([MINE]);
+});

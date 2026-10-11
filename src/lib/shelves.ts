@@ -18,6 +18,10 @@ const shelfRecord = (shelf: Shelf): Shelf => ({
   connectionUrl: shelf.connectionUrl,
   ...(shelf.token ? { token: shelf.token } : {}),
 });
+// A pairing token is the whole login: a shelf that has one has no username (older
+// versions could save one beside it), so every shelf of a pairing is one connection.
+const identity = (shelf: Shelf): Shelf =>
+  shelf.token ? { ...shelf, username: '' } : shelf;
 const sameConnection = (
   a: Pick<Shelf, 'connectionUrl' | 'username'>,
   b: Pick<Shelf, 'connectionUrl' | 'username'>,
@@ -28,13 +32,13 @@ const sameConnection = (
  * them all and no shelf keeps a revoked token.
  */
 export async function saveShelf(shelf: Shelf) {
-  const record = shelfRecord(shelf);
+  const record = shelfRecord(identity(shelf));
   const stale = (stored: Shelf[]) =>
     stored.filter(
       (s) =>
         s.url !== record.url &&
-        sameConnection(s, record) &&
-        s.token !== record.token,
+        sameConnection(identity(s), record) &&
+        (s.token !== record.token || s.username !== record.username),
     );
   if (isDesktop()) {
     await native('put', { store: 'shelves', value: record });
@@ -43,7 +47,7 @@ export async function saveShelf(shelf: Shelf) {
     for (const s of stale(stored))
       await native('put', {
         store: 'shelves',
-        value: shelfRecord({ ...s, token: record.token }),
+        value: shelfRecord({ ...identity(s), token: record.token }),
       });
     return;
   }
@@ -56,7 +60,7 @@ export async function saveShelf(shelf: Shelf) {
     const req = store.getAll();
     req.onsuccess = () => {
       for (const s of stale(req.result))
-        store.put(shelfRecord({ ...s, token: record.token }));
+        store.put(shelfRecord({ ...identity(s), token: record.token }));
     };
   }
   await finished;
@@ -72,27 +76,30 @@ function plainShelf(shelf: Shelf): Shelf {
       ...(shelf.token ? { token: shelf.token } : {}),
     });
     const { token: _, ...rest } = shelf;
-    return {
+    return identity({
       ...rest,
       url: plain.target,
       connectionUrl: plain.connection.url,
       ...(plain.connection.token ? { token: plain.connection.token } : {}),
-    };
+    });
   } catch {
     return shelf;
   }
 }
-// Legacy shelves rewritten to plain URLs. Shelves already plain are kept as they are;
+// Legacy shelves rewritten to plain URLs, and a pairing shelf's stray username dropped.
+// Shelves already plain are kept as they are;
 // a legacy row only fills a URL no plain shelf holds, and gives its token only to a
 // shelf of the same login that has none. Pure: the stored records are not modified.
 function planShelves(stored: Shelf[]): { result: Shelf[]; changed: boolean } {
   const plain = new Map<string, Shelf>();
   const legacy: Shelf[] = [];
+  let renamed = false;
   for (const shelf of stored) {
     const next = plainShelf(shelf);
-    if (next.url === shelf.url && next.connectionUrl === shelf.connectionUrl)
+    if (next.url === shelf.url && next.connectionUrl === shelf.connectionUrl) {
+      renamed ||= next.username !== shelf.username;
       plain.set(next.url, next);
-    else legacy.push(next);
+    } else legacy.push(next);
   }
   for (const next of legacy) {
     const kept = plain.get(next.url);
@@ -100,7 +107,7 @@ function planShelves(stored: Shelf[]): { result: Shelf[]; changed: boolean } {
     else if (!kept.token && next.token && kept.username === next.username)
       plain.set(next.url, { ...kept, token: next.token });
   }
-  return { result: [...plain.values()], changed: legacy.length > 0 };
+  return { result: [...plain.values()], changed: renamed || legacy.length > 0 };
 }
 export async function shelves(): Promise<Shelf[]> {
   if (isDesktop()) {
@@ -169,7 +176,8 @@ export async function forgetShelf(
   if (connection) {
     const req = store.getAll();
     req.onsuccess = () => {
-      for (const s of req.result as Shelf[]) if (gone(s)) store.delete(s.url);
+      for (const s of req.result as Shelf[])
+        if (gone(identity(s))) store.delete(s.url);
     };
   }
   await finished;

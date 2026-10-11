@@ -441,7 +441,7 @@ describe('failures that say what to do', () => {
         10,
       ),
     ).rejects.toThrow(
-      / On a Mac, also allow Skrivist Books under System Settings › Privacy & Security › Local Network\.$/,
+      / On macOS 15 or later, also allow Skrivist Books under System Settings › Privacy & Security › Local Network\.$/,
     );
   });
 });

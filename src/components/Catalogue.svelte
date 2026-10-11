@@ -1,13 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import {
-    acquisition,
-    navigation,
-    safeUrl,
-    type Feed,
-    type Entry,
-    type Link,
-  } from '../lib/feed';
+  import { safeUrl, type Feed, type Entry, type Link } from '../lib/feed';
   import {
     plainRequest,
     splitToken,
@@ -21,6 +14,7 @@
   import { listBooks, getFile, type Book } from '../lib/store';
   import { saveShelf, shelves, forgetShelf, type Shelf } from '../lib/shelves';
   import { importBook } from '../lib/import';
+  import CatalogueFeed from './CatalogueFeed.svelte';
   export let onread: (book: Book) => void;
   export let onadded: () => void;
   /** The latest pairing link (id counts scans): filled in, never fetched until Connect. */
@@ -36,8 +30,7 @@
     connection: Connection | null = null,
     // The connection a request in flight will use, shown or not yet.
     loading: Connection | undefined;
-  let page = 0,
-    busy = false,
+  let busy = false,
     error = '',
     notice = '',
     downloading = '',
@@ -45,7 +38,6 @@
   let controller: AbortController | undefined;
   let downloadController: AbortController | undefined;
   let pendingShelf: Shelf | undefined;
-  const size = 24;
   let appliedPairing = 0;
   $: if (pairing.url && pairing.id !== appliedPairing) {
     appliedPairing = pairing.id;
@@ -59,7 +51,6 @@
     feedUrl = '';
     connection = null;
     history = [];
-    page = 0;
     pendingShelf = undefined;
     url = pairing.url;
     username = '';
@@ -68,13 +59,6 @@
     if (!downloading) notice = '';
     onpaired();
   }
-  $: entries = feed?.entries.slice(page * size, (page + 1) * size) || [];
-  $: next = feed?.links.find((link) => link.rel.split(/\s+/).includes('next'));
-  $: previous = feed?.links.find(
-    (link) =>
-      link.rel.split(/\s+/).includes('previous') ||
-      link.rel.split(/\s+/).includes('prev'),
-  );
   onMount(() => {
     shelves()
       .then((value) => (saved = value))
@@ -104,7 +88,6 @@
       feedUrl = target;
       connection = conn;
       rememberConnection(conn);
-      page = 0;
       // Paired: the form keeps the plain URL, the token lives with the connection.
       if (remember && url === from.url) url = conn.url;
       if (remember) {
@@ -222,28 +205,17 @@
         ? `Forgot ${shelf.title} and its saved shelves.`
         : `Forgot ${shelf.title}.`;
   }
-  function browse(link: Link) {
-    if (!connection) return;
-    history = [...history, feedUrl];
-    load(link.href, connection, false);
-  }
   function back() {
     if (!connection || !history.length) return;
     const target = history.at(-1)!;
     history = history.slice(0, -1);
     load(target, connection, false);
   }
-  function nextPage() {
-    if (!feed || !connection) return;
-    if ((page + 1) * size < feed.entries.length) page++;
-    else if (next) {
-      history = [...history, feedUrl];
-      load(next.href, connection, false);
-    }
-  }
-  function previousPage() {
-    if (page > 0) page--;
-    else if (previous && connection) load(previous.href, connection, false);
+  /** Opens a link of the feed: forward into it (Back returns), or to its previous page. */
+  function follow(link: Link, forward: boolean) {
+    if (!connection) return;
+    if (forward) history = [...history, feedUrl];
+    load(link.href, connection, false);
   }
   async function read(entry: Entry, link: Link) {
     if (!connection || downloading) return;
@@ -377,52 +349,16 @@
           >
         </div>{/each}
     </div>{/if}
-  {#if feed}<div class="catalogue-heading">
-      <div>
-        {#if history.length}<button class="quiet" disabled={busy} onclick={back}
-            >← Back</button
-          >{/if}
-        <h2>{feed.title}</h2>
-        <span class="muted"
-          >{page * size + 1}–{Math.min((page + 1) * size, feed.entries.length)} of
-          {feed.entries.length} entries on this feed</span
-        >
-      </div>
-      <button class="secondary" onclick={saveCurrent}>Save this shelf</button>
-    </div>
-    <div class="catalogue-grid" aria-busy={busy}>
-      {#each entries as entry, i (feedUrl + ':' + page + ':' + i)}{@const file =
-          entry.links.find(acquisition)}{@const folder =
-          entry.links.find(navigation)}
-        <article class="catalogue-entry">
-          <span class="entry-symbol" aria-hidden="true">{file ? '▤' : '↳'}</span
-          >
-          <div>
-            <h3>{entry.title}</h3>
-            <p>
-              {entry.author || (file ? 'Ready to fetch' : 'Browse this shelf')}
-            </p>
-          </div>
-          {#if file}<button
-              class="secondary"
-              disabled={!!downloading || busy}
-              onclick={() => read(entry, file)}
-              >{downloading === file.href ? 'Fetching…' : 'Read book'}</button
-            >{:else if folder}<button
-              class="secondary"
-              disabled={busy}
-              onclick={() => browse(folder)}>Browse →</button
-            >{:else}<span class="muted">No EPUB or PDF</span>{/if}
-        </article>{/each}
-    </div>
-    {#if !entries.length}<p class="empty-note">This shelf is empty.</p>{/if}
-    <nav class="pagination" aria-label="Catalogue pages">
-      <button disabled={busy || (!page && !previous)} onclick={previousPage}
-        >← Previous</button
-      ><span>Page {page + 1}</span><button
-        disabled={busy || (!(feed.entries.length > (page + 1) * size) && !next)}
-        onclick={nextPage}>Next →</button
-      >
-    </nav>
+  {#if feed}{#key feed}<CatalogueFeed
+        {feed}
+        {feedUrl}
+        {busy}
+        {downloading}
+        canGoBack={history.length > 0}
+        onback={back}
+        onsave={saveCurrent}
+        onread={read}
+        onfollow={follow}
+      />{/key}
   {/if}
 </section>

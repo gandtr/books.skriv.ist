@@ -4,6 +4,11 @@
     acquisition,
     navigation,
     safeUrl,
+    type Feed,
+    type Entry,
+    type Link,
+  } from '../lib/feed';
+  import {
     plainRequest,
     splitToken,
     rememberConnection,
@@ -12,9 +17,6 @@
     getFeed,
     getBookFile,
     type Connection,
-    type Feed,
-    type Entry,
-    type Link,
   } from '../lib/opds';
   import { listBooks, getFile, type Book } from '../lib/store';
   import { saveShelf, shelves, forgetShelf, type Shelf } from '../lib/shelves';

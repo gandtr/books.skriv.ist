@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Blob as NodeBlob } from 'node:buffer';
+import { parseFeed, safeUrl, acquisition } from '../src/lib/feed';
 import {
-  parseFeed,
-  safeUrl,
-  acquisition,
   fetchLimited,
   getFeed,
   splitToken,

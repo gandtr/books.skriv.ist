@@ -17,6 +17,8 @@ import { shelves } from '../src/lib/shelves';
 
 const A = 'https://a.example/opds/t/aaa/v1.2/catalog';
 const B = 'https://b.example/opds/t/bbb/v1.2/catalog';
+// The form shows a pairing link's catalogue without its token.
+const plain = (url: string) => url.replace(/\/t\/[^/]+/, '');
 
 let target: HTMLElement;
 let app: ReturnType<typeof mount> | undefined;
@@ -53,7 +55,7 @@ it('drops a pending request when a new pairing arrives', async () => {
   expect(connectButton().disabled).toBe(true);
 
   pair(B);
-  expect(urlField().value).toBe(B);
+  expect(urlField().value).toBe(plain(B));
   expect(connectButton().disabled).toBe(false);
 
   feeds.pending[0]('Library A');
@@ -71,7 +73,7 @@ it('clears the feed already on screen when a new pairing arrives', async () => {
 
   pair(B);
   expect(target.querySelector('.catalogue-heading')).toBeNull();
-  expect(urlField().value).toBe(B);
+  expect(urlField().value).toBe(plain(B));
 });
 
 it('applies the same link again when it is scanned again', () => {
@@ -79,5 +81,5 @@ it('applies the same link again when it is scanned again', () => {
   urlField().dispatchEvent(new Event('input'));
   flushSync();
   pair(A);
-  expect(urlField().value).toBe(A);
+  expect(urlField().value).toBe(plain(A));
 });

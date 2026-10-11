@@ -4,6 +4,10 @@ const CHUNK = 1024 * 1024;
 export function isDesktop(): boolean {
   return typeof __SKRIVIST_DESKTOP__ !== 'undefined' && __SKRIVIST_DESKTOP__;
 }
+/** macOS asks before an app may reach the local network; a refusal looks like any network failure. */
+export function networkHint(): string {
+  return isDesktop() && /Macintosh/.test(navigator.userAgent) ? ' On a Mac, also allow Skrivist Books under System Settings › Privacy & Security › Local Network.' : '';
+}
 interface StoredBlob { __skrivistBlob: string; size: number; mime: string }
 async function encode(value: unknown): Promise<unknown> {
   if (value instanceof Blob) {

@@ -32,3 +32,10 @@ export function takeOpdsLink(win: PairWindow = window): string {
   win.history.replaceState(win.history.state, '', win.location.pathname + win.location.search);
   return link;
 }
+
+/** The catalogue URL inside a pasted pairing link (https://<reader>/#opds=… or skrivist-<app>://pair#opds=…);
+ * any other value as it came. Kept identical in books.skriv.ist and comics.skriv.ist. */
+export function pairingTarget(value: string): string {
+  const i = value.indexOf('#');
+  return i < 0 ? value : new URLSearchParams(value.slice(i + 1)).get('opds') || value;
+}

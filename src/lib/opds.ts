@@ -1,5 +1,6 @@
 /** OPDS connections: tokens, credentials and size-limited fetches. */
 import { anySignal } from './abort';
+import { networkHint } from './desktop';
 import { parseFeed, safeUrl, type Entry, type Feed, type Link } from './feed';
 export interface Connection {
   url: string;
@@ -90,6 +91,16 @@ export function carriesToken(href: string, token?: string): boolean {
 const leaksToken = (href: string, connection: Connection) =>
   new URL(href).origin !== new URL(connection.url).origin &&
   carriesToken(href, connection.token);
+function failed(status: number, url: string, connection: Connection): string {
+  if (status === 401 || status === 403)
+    return connection.token && headers(url, connection).has('Authorization')
+      ? 'Armarium no longer accepts this pairing. Pair again from Armarium Admin.'
+      : 'Catalogue login was rejected. Check your username and password, or open the pairing link again.';
+  // Armarium's answer to a Host it is not configured for (readable since it sends CORS headers first).
+  if (status === 421)
+    return 'This server does not answer to that host name. Add it to Armarium’s allowed_hosts.';
+  return `Catalogue returned HTTP ${status}.`;
+}
 function headers(url: string, connection: Connection): Headers {
   const result = new Headers();
   // Credentials never follow a catalogue link to another origin.
@@ -146,16 +157,12 @@ export async function fetchLimited(
     } catch (error) {
       if (combined.aborted) throw error;
       throw new Error(
-        'Cannot reach the catalogue. Check its URL, HTTPS and CORS settings. Redirects are disabled; enter the final feed URL.',
+        `Cannot reach the catalogue. Check its URL, HTTPS and CORS settings. Redirects are disabled; enter the final feed URL.${networkHint()}`,
       );
     }
     if (!response.ok) {
       await response.body?.cancel();
-      throw new Error(
-        response.status === 401 || response.status === 403
-          ? 'Catalogue login was rejected. Check your username and password, or open the pairing link again.'
-          : `Catalogue returned HTTP ${response.status}.`,
-      );
+      throw new Error(failed(response.status, url, connection));
     }
     if (Number(response.headers.get('content-length')) > limit) {
       await response.body?.cancel();

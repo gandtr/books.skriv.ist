@@ -14,6 +14,7 @@
   import { listBooks, getFile, type Book } from '../lib/store';
   import { saveShelf, shelves, forgetShelf, type Shelf } from '../lib/shelves';
   import { importBook } from '../lib/import';
+  import { pairingTarget } from '../lib/pair';
   import CatalogueFeed from './CatalogueFeed.svelte';
   export let onread: (book: Book) => void;
   export let onadded: () => void;
@@ -52,7 +53,7 @@
     connection = null;
     history = [];
     pendingShelf = undefined;
-    url = pairing.url;
+    url = heldPairing(pairing.url);
     username = '';
     password = '';
     error = '';
@@ -109,8 +110,23 @@
       }
     }
   }
+  /** A pairing link's catalogue URL for the form. Its token is held for this session
+   * (Connect finds it there), never shown. */
+  function heldPairing(value: string): string {
+    const paired = splitToken(pairingTarget(value));
+    if (paired.token)
+      rememberConnection({
+        url: paired.url,
+        username: '',
+        password: '',
+        token: paired.token,
+      });
+    return paired.url;
+  }
   function connect() {
     history = [];
+    // A whole pairing link pasted into the form connects to the catalogue inside it.
+    url = heldPairing(url);
     const conn: Connection = { url, username, password };
     const shelf =
       pendingShelf &&
@@ -299,6 +315,7 @@
       >OPDS catalogue URL<input
         type="url"
         required
+        autocomplete="off"
         bind:value={url}
         placeholder="https://your-server.example/opds"
       /></label

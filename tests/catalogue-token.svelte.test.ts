@@ -415,3 +415,24 @@ it('sends a password typed without a username as that login, over a token held f
     { url: PLAIN, authorization: `Basic ${btoa(':typed')}` },
   ]);
 });
+
+it('keeps the token of a pairing link out of the form and the page', async () => {
+  mountCatalogue();
+  expect(urlField().value).toBe(PLAIN);
+  expect(urlField().getAttribute('autocomplete')).toBe('off');
+  expect(document.body.innerHTML).not.toContain(TOKEN);
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  expect(requests).toEqual([{ url: PLAIN, authorization: `Bearer ${TOKEN}` }]);
+  expect(document.body.innerHTML).not.toContain(TOKEN);
+});
+
+it('connects a whole pairing link pasted into the form', async () => {
+  mountCatalogue('');
+  urlField().value = `https://books.skriv.ist/#opds=${encodeURIComponent(PAIRED)}`;
+  urlField().dispatchEvent(new Event('input', { bubbles: true }));
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  expect(requests).toEqual([{ url: PLAIN, authorization: `Bearer ${TOKEN}` }]);
+  expect(urlField().value).toBe(PLAIN);
+});

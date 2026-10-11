@@ -396,3 +396,52 @@ describe('Armarium path tokens', () => {
     expect(savedConnection(calibre, '')?.token).toBe('tok-calibre');
   });
 });
+
+describe('failures that say what to do', () => {
+  const fail = (response: () => Response) =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response()),
+    );
+  const connection = {
+    url: 'https://nas.example/opds',
+    username: '',
+    password: '',
+  };
+  it('says Armarium no longer accepts a pairing, rather than blaming a password', async () => {
+    fail(() => new Response('', { status: 401 }));
+    await expect(
+      fetchLimited(connection.url, { ...connection, token: 'T' }, 10),
+    ).rejects.toThrow(
+      'Armarium no longer accepts this pairing. Pair again from Armarium Admin.',
+    );
+  });
+  it('names allowed_hosts when the server does not answer to that host name', async () => {
+    fail(() => new Response('unknown host', { status: 421 }));
+    await expect(fetchLimited(connection.url, connection, 10)).rejects.toThrow(
+      'This server does not answer to that host name. Add it to Armarium’s allowed_hosts.',
+    );
+  });
+  it('adds the Local Network setting to a network failure in the Mac app', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Load failed');
+      }),
+    );
+    vi.stubGlobal('__SKRIVIST_DESKTOP__', true);
+    vi.stubGlobal('navigator', {
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) AppleWebKit/605.1.15',
+    });
+    await expect(
+      fetchLimited(
+        'http://192.168.11.3:8580/opds',
+        { ...connection, url: 'http://192.168.11.3:8580/opds' },
+        10,
+      ),
+    ).rejects.toThrow(
+      / On a Mac, also allow Skrivist Books under System Settings › Privacy & Security › Local Network\.$/,
+    );
+  });
+});

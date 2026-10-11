@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { takeOpdsLink } from '../src/lib/pair';
+import { pairingTarget, takeOpdsLink } from '../src/lib/pair';
 
 const U = 'https://a.example/opds/t/x_y-z/v1.2/catalog';
 const READ = '#read=' + 'a'.repeat(64);
@@ -81,4 +81,12 @@ it('the scrubber still strips the fragment when storage is denied, and the app s
   }
   expect(takeOpdsLink()).toBe(U);
   expect(takeOpdsLink()).toBe('');
+});
+
+it('takes the catalogue out of a pasted pairing link, from a hosted reader or the desktop app', () => {
+  const inner = 'https://nas/opds/t/T/v1.2/catalog';
+  expect(pairingTarget(`https://books.skriv.ist/#opds=${encodeURIComponent(inner)}`)).toBe(inner);
+  expect(pairingTarget(`skrivist-books://pair#opds=${encodeURIComponent(inner)}`)).toBe(inner);
+  expect(pairingTarget('https://nas/opds/v1.2/catalog')).toBe('https://nas/opds/v1.2/catalog');
+  expect(pairingTarget('https://nas/opds#top')).toBe('https://nas/opds#top');
 });

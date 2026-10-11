@@ -7,6 +7,8 @@ import App from '../src/App.svelte';
 
 const A = 'https://a.example/opds/t/aaa/v1.2/catalog';
 const B = 'https://b.example/opds/t/bbb/v1.2/catalog';
+// The form shows a pairing link's catalogue without its token.
+const plain = (url: string) => url.replace(/\/t\/[^/]+/, '');
 
 let target: HTMLElement;
 let app: ReturnType<typeof mount> | undefined;
@@ -56,12 +58,12 @@ afterEach(() => {
 
 it('opens Catalogues with the scanned pairing link filled in', async () => {
   await scan(A);
-  expect(urlField()?.value).toBe(A);
+  expect(urlField()?.value).toBe(plain(A));
 });
 
 it('does not replay a consumed pairing link when Catalogues is opened again', async () => {
   await scan(A);
-  expect(urlField()?.value).toBe(A);
+  expect(urlField()?.value).toBe(plain(A));
   await go('Library');
   await go('Catalogues');
   expect(urlField()?.value).toBe('');
@@ -70,7 +72,7 @@ it('does not replay a consumed pairing link when Catalogues is opened again', as
 it('does not bring an older link back after a newer one was consumed', async () => {
   await scan(A);
   await scan(B);
-  expect(urlField()?.value).toBe(B);
+  expect(urlField()?.value).toBe(plain(B));
   await go('Library');
   await go('Catalogues');
   expect(urlField()?.value).toBe('');
@@ -80,5 +82,5 @@ it('applies the same link again when it is scanned again', async () => {
   await scan(A);
   await go('Library');
   await scan(A);
-  expect(urlField()?.value).toBe(A);
+  expect(urlField()?.value).toBe(plain(A));
 });

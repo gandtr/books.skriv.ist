@@ -436,3 +436,84 @@ it('connects a whole pairing link pasted into the form', async () => {
   expect(requests).toEqual([{ url: PLAIN, authorization: `Bearer ${TOKEN}` }]);
   expect(urlField().value).toBe(PLAIN);
 });
+
+const typeInto = (input: HTMLInputElement, value: string) => {
+  input.value = value;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+};
+const usernameField = () =>
+  target.querySelector<HTMLInputElement>('input[autocomplete=username]')!;
+
+it('forgetting a catalogue also forgets the sub-shelf being opened, so Connect cannot bring it back', async () => {
+  const RECENT = 'https://a.example/opds/v1.2/recent';
+  await saveShelf({
+    url: PLAIN,
+    title: 'Library',
+    username: '',
+    connectionUrl: PLAIN,
+    token: TOKEN,
+  });
+  await saveShelf({
+    url: RECENT,
+    title: 'Recent',
+    username: '',
+    connectionUrl: PLAIN,
+    token: TOKEN,
+  });
+  mountCatalogue('');
+  await settle();
+  button(/^Recent/).click();
+  await settle();
+  (
+    target.querySelector('[aria-label="Forget Library"]') as HTMLButtonElement
+  ).click();
+  await settle();
+  requireAuth = true;
+  requests = [];
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  expect(requests).toEqual([{ url: PLAIN, authorization: null }]);
+  expect(await rawShelves()).toEqual([]);
+});
+
+it('a token in a typed or pasted URL is used whatever the username field holds', async () => {
+  mountCatalogue('');
+  typeInto(usernameField(), 'reader');
+  typeInto(urlField(), PAIRED);
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  typeInto(
+    urlField(),
+    `https://books.skriv.ist/#opds=${encodeURIComponent(PAIRED)}`,
+  );
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  expect(requests).toEqual([
+    { url: PLAIN, authorization: `Bearer ${TOKEN}` },
+    { url: PLAIN, authorization: `Bearer ${TOKEN}` },
+  ]);
+});
+
+it('a username alone does not replace the pairing a link filled in', async () => {
+  mountCatalogue();
+  typeInto(usernameField(), 'reader');
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  expect(requests).toEqual([{ url: PLAIN, authorization: `Bearer ${TOKEN}` }]);
+});
+
+it('a pairing link applied in this page wins over the token a listed shelf still holds', async () => {
+  const RECENT = 'https://a.example/opds/v1.2/recent';
+  await saveShelf({
+    url: RECENT,
+    title: 'Recent',
+    username: '',
+    connectionUrl: PLAIN,
+    token: 'tok-old',
+  });
+  mountCatalogue('https://a.example/opds/t/tok-new/v1.2/catalog');
+  await settle();
+  button(/^Recent/).click();
+  await settle();
+  expect(requests).toEqual([{ url: RECENT, authorization: 'Bearer tok-new' }]);
+});

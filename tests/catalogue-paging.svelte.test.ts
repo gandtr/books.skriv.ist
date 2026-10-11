@@ -82,3 +82,25 @@ it('pages through a feed on screen first, then follows its next and previous lin
   expect(requests.at(-1)).toBe(PREVIOUS);
   expect(button(/Back/)).toBeUndefined();
 });
+
+it('keeps keyboard focus on Next while the next server page loads', async () => {
+  app = mount(Catalogue, {
+    target,
+    props: {
+      pairing: { url: ROOT, id: 1 },
+      onread: () => {},
+      onadded: () => {},
+    },
+  });
+  flushSync();
+  target.querySelector('form')!.requestSubmit();
+  await settle();
+  button(/Next/).click();
+  await settle();
+  const next = button(/Next/);
+  next.focus();
+  next.click();
+  await settle();
+  expect(requests.at(-1)).toBe(NEXT);
+  expect(document.activeElement).toBe(next);
+});

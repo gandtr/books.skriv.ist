@@ -31,7 +31,11 @@
     onfollow: (link: Link, forward: boolean) => void;
   } = $props();
   const size = 24;
-  let page = $state(0);
+  // Back to the first screen whenever a new feed arrives; the paging buttons move it.
+  let page = $derived.by(() => {
+    void feed;
+    return 0;
+  });
   const entries = $derived(feed.entries.slice(page * size, (page + 1) * size));
   const rel = (link: Link, name: string) =>
     link.rel.split(/\s+/).includes(name);

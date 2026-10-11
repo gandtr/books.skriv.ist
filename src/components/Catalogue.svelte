@@ -5,6 +5,8 @@
     plainRequest,
     splitToken,
     rememberConnection,
+    rememberPairing,
+    pairedToken,
     forgetConnection,
     savedConnection,
     getFeed,
@@ -115,7 +117,7 @@
   function heldPairing(value: string): string {
     const paired = splitToken(pairingTarget(value));
     if (paired.token)
-      rememberConnection({
+      rememberPairing({
         url: paired.url,
         username: '',
         password: '',
@@ -125,7 +127,9 @@
   }
   function connect() {
     history = [];
-    // A whole pairing link pasted into the form connects to the catalogue inside it.
+    // A whole pairing link pasted into the form connects to the catalogue inside it;
+    // a token in the typed URL is that connection's, whatever the login fields hold.
+    const typed = splitToken(pairingTarget(url)).token;
     url = heldPairing(url);
     const conn: Connection = { url, username, password };
     const shelf =
@@ -134,12 +138,17 @@
       pendingShelf.username === username
         ? pendingShelf
         : undefined;
-    // A paired form shows the plain URL: the token comes from this session or
-    // from the shelf, unless a fresh token URL or a password was just typed.
-    if (!splitToken(url).token && !password) {
+    // A paired form shows the plain URL: the token comes from a pairing applied
+    // here, this session or the shelf. A typed password is a login and wins; a
+    // username alone does not log in to Armarium, so it keeps the held pairing.
+    if (typed) conn.token = typed;
+    else if (!password) {
       let token: string | undefined;
       try {
-        token = savedConnection(url, username)?.token;
+        token =
+          pairedToken(url, '') ||
+          savedConnection(url, username)?.token ||
+          savedConnection(url, '')?.token;
       } catch {
         // Not a URL: load() reports it.
       }
@@ -153,14 +162,18 @@
     pendingShelf = shelf;
     const session = savedConnection(shelf.connectionUrl, shelf.username);
     // A paired shelf keeps its token on this device, so it opens after a reload.
-    // That token wins over one this page remembers: saving a pairing gives it to
-    // every shelf of the connection, so the stored one is the newest.
-    const conn: Connection | undefined = shelf.token
+    // Newest first: a pairing link applied in this page, then a password typed this
+    // session, then the shelf's own token (saving a pairing gives it to every shelf
+    // of the connection), which wins over a token this page merely remembers.
+    const token =
+      pairedToken(shelf.connectionUrl, shelf.username) ??
+      (session?.password ? undefined : shelf.token);
+    const conn: Connection | undefined = token
       ? {
           url: shelf.connectionUrl,
           username: shelf.username,
           password: session?.password ?? '',
-          token: shelf.token,
+          token,
         }
       : session;
     url = shelf.connectionUrl;
@@ -210,7 +223,17 @@
     }
     forgetConnection(shelf.connectionUrl, shelf.username);
     password = '';
-    if (pendingShelf?.url === shelf.url) pendingShelf = undefined;
+    // A shelf being opened goes with it, or with its catalogue: Connect must not bring it back.
+    if (
+      pendingShelf &&
+      (pendingShelf.url === shelf.url ||
+        (root &&
+          same({
+            url: pendingShelf.connectionUrl,
+            username: pendingShelf.username,
+          })))
+    )
+      pendingShelf = undefined;
     // A token still in the form would let Connect bring the shelf back.
     const typed = splitToken(url);
     if (typed.token && same({ url, username: shelf.username })) url = typed.url;
@@ -366,16 +389,16 @@
           >
         </div>{/each}
     </div>{/if}
-  {#if feed}{#key feed}<CatalogueFeed
-        {feed}
-        {feedUrl}
-        {busy}
-        {downloading}
-        canGoBack={history.length > 0}
-        onback={back}
-        onsave={saveCurrent}
-        onread={read}
-        onfollow={follow}
-      />{/key}
+  {#if feed}<CatalogueFeed
+      {feed}
+      {feedUrl}
+      {busy}
+      {downloading}
+      canGoBack={history.length > 0}
+      onback={back}
+      onsave={saveCurrent}
+      onread={read}
+      onfollow={follow}
+    />
   {/if}
 </section>

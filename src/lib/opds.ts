@@ -287,4 +287,16 @@ export function savedConnection(
 
 export function forgetConnection(url: string, username: string) {
   sessions.delete(sessionKey(url, username));
+  paired.delete(sessionKey(url, username));
+}
+// Connections whose session token came from a pairing link applied in this page: it is
+// newer than the token any saved shelf of that connection still holds.
+const paired = new Set<string>();
+export function rememberPairing(connection: Connection) {
+  rememberConnection(connection);
+  paired.add(sessionKey(connection.url, connection.username));
+}
+export function pairedToken(url: string, username: string): string | undefined {
+  const key = sessionKey(url, username);
+  return paired.has(key) ? sessions.get(key)?.token : undefined;
 }

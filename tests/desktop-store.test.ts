@@ -46,7 +46,54 @@ it('saves a paired shelf token in its own field', async () => {
         },
       },
     },
+    // A saved token is the connection's: its other shelves are read to share it.
+    { action: 'list', args: { store: 'shelves' } },
   ]);
+});
+/** Native shelves in memory, answering list, get, put and delete. */
+function nativeShelves(initial: Shelf[]) {
+  const rows = new Map(initial.map((s) => [s.url, s]));
+  ipc.mockImplementation(async (_command, call: any) => {
+    const { action, args } = call;
+    if (action === 'list') return [...rows.values()];
+    if (action === 'get') return rows.get(args.key) ?? null;
+    if (action === 'put') rows.set(args.value.url, args.value);
+    if (action === 'delete') rows.delete(args.key);
+    return null;
+  });
+  return rows;
+}
+const SUB = 'https://a.example/opds/v1.2/series/3';
+const OTHER = 'https://b.example/opds/v1.2/catalog';
+const row = (url: string, connectionUrl: string, token?: string): Shelf => ({
+  url,
+  title: url,
+  username: '',
+  connectionUrl,
+  ...(token ? { token } : {}),
+});
+it('re-pairing gives every shelf of the catalogue the new token in native storage', async () => {
+  const rows = nativeShelves([
+    row(PLAIN, PLAIN, 'A'),
+    row(SUB, PLAIN, 'A'),
+    row(OTHER, OTHER, 'X'),
+  ]);
+  await saveShelf(row(PLAIN, PLAIN, 'B'));
+  expect([...rows.values()].map((s) => [s.url, s.token])).toEqual([
+    [PLAIN, 'B'],
+    [SUB, 'B'],
+    [OTHER, 'X'],
+  ]);
+});
+it('forgetting a catalogue deletes its shelves and their legacy rows from native storage', async () => {
+  const rows = nativeShelves([
+    row(LEGACY, LEGACY),
+    row(PLAIN, PLAIN, 'A'),
+    row(SUB, PLAIN, 'A'),
+    row(OTHER, OTHER, 'X'),
+  ]);
+  await forgetShelf(PLAIN, { connectionUrl: PLAIN, username: '' });
+  expect([...rows.keys()]).toEqual([OTHER]);
 });
 it('moves a legacy token out of shelf URLs: the plain shelf is written before the old one is deleted', async () => {
   const legacy: Shelf = {

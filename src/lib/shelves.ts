@@ -18,13 +18,47 @@ const shelfRecord = (shelf: Shelf): Shelf => ({
   connectionUrl: shelf.connectionUrl,
   ...(shelf.token ? { token: shelf.token } : {}),
 });
+const sameConnection = (
+  a: Pick<Shelf, 'connectionUrl' | 'username'>,
+  b: Pick<Shelf, 'connectionUrl' | 'username'>,
+) => a.connectionUrl === b.connectionUrl && a.username === b.username;
+/**
+ * A pairing token belongs to the connection, not to one shelf: saving it gives it
+ * to every shelf saved from the same catalogue and login, so pairing again reaches
+ * them all and no shelf keeps a revoked token.
+ */
 export async function saveShelf(shelf: Shelf) {
-  if (isDesktop())
-    return native('put', { store: 'shelves', value: shelfRecord(shelf) });
+  const record = shelfRecord(shelf);
+  const stale = (stored: Shelf[]) =>
+    stored.filter(
+      (s) =>
+        s.url !== record.url &&
+        sameConnection(s, record) &&
+        s.token !== record.token,
+    );
+  if (isDesktop()) {
+    await native('put', { store: 'shelves', value: record });
+    if (!record.token) return;
+    const stored: Shelf[] = (await native('list', { store: 'shelves' })) ?? [];
+    for (const s of stale(stored))
+      await native('put', {
+        store: 'shelves',
+        value: shelfRecord({ ...s, token: record.token }),
+      });
+    return;
+  }
   const d = await db(),
     tx = d.transaction('shelves', 'readwrite'),
-    finished = done(tx);
-  tx.objectStore('shelves').put(shelfRecord(shelf));
+    finished = done(tx),
+    store = tx.objectStore('shelves');
+  store.put(record);
+  if (record.token) {
+    const req = store.getAll();
+    req.onsuccess = () => {
+      for (const s of stale(req.result))
+        store.put(shelfRecord({ ...s, token: record.token }));
+    };
+  }
   await finished;
 }
 // A shelf saved before tokens had a field of their own carries its token inside
@@ -108,18 +142,31 @@ export async function shelves(): Promise<Shelf[]> {
   await finished;
   return result;
 }
-export async function forgetShelf(url: string) {
+/** Forgets a shelf; given its connection, every shelf saved from that catalogue and login too. */
+export async function forgetShelf(
+  url: string,
+  connection?: Pick<Shelf, 'connectionUrl' | 'username'>,
+) {
+  const gone = (s: Shelf) =>
+    s.url === url || (!!connection && sameConnection(s, connection));
   if (isDesktop()) {
-    // Also any legacy row that becomes this shelf (kept until its token was stored).
+    // Also any legacy row that becomes one of them (kept until its token was stored).
     const stored: Shelf[] = await native('list', { store: 'shelves' });
     for (const shelf of stored)
-      if (shelf.url === url || plainShelf(shelf).url === url)
+      if (gone(shelf) || gone(plainShelf(shelf)))
         await native('delete', { store: 'shelves', key: shelf.url });
     return;
   }
   const d = await db(),
     tx = d.transaction('shelves', 'readwrite'),
-    finished = done(tx);
-  tx.objectStore('shelves').delete(url);
+    finished = done(tx),
+    store = tx.objectStore('shelves');
+  store.delete(url);
+  if (connection) {
+    const req = store.getAll();
+    req.onsuccess = () => {
+      for (const s of req.result as Shelf[]) if (gone(s)) store.delete(s.url);
+    };
+  }
   await finished;
 }

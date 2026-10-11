@@ -152,15 +152,18 @@
   }
   function savedOpen(shelf: Shelf) {
     pendingShelf = shelf;
-    let conn = savedConnection(shelf.connectionUrl, shelf.username);
+    const session = savedConnection(shelf.connectionUrl, shelf.username);
     // A paired shelf keeps its token on this device, so it opens after a reload.
-    if (shelf.token && !conn?.token)
-      conn = {
-        url: shelf.connectionUrl,
-        username: shelf.username,
-        password: conn?.password ?? '',
-        token: shelf.token,
-      };
+    // That token wins over one this page remembers: saving a pairing gives it to
+    // every shelf of the connection, so the stored one is the newest.
+    const conn: Connection | undefined = shelf.token
+      ? {
+          url: shelf.connectionUrl,
+          username: shelf.username,
+          password: session?.password ?? '',
+          token: shelf.token,
+        }
+      : session;
     url = shelf.connectionUrl;
     username = shelf.username;
     password = '';
@@ -173,16 +176,25 @@
   }
 
   async function forget(shelf: Shelf) {
+    // One identity everywhere: the catalogue's connection URL and the login.
     const same = (c: { url: string; username: string }) => {
       try {
         return (
-          new URL(c.url).origin === new URL(shelf.connectionUrl).origin &&
+          splitToken(c.url).url === shelf.connectionUrl &&
           c.username === shelf.username
         );
       } catch {
         return false;
       }
     };
+    // Forgetting the catalogue itself forgets every shelf saved from it.
+    const root = shelf.url === shelf.connectionUrl;
+    const others = saved.some(
+      (s) =>
+        s.url !== shelf.url &&
+        s.connectionUrl === shelf.connectionUrl &&
+        s.username === shelf.username,
+    );
     // Stop whatever uses these credentials before touching storage, shown or
     // not: a load still in flight would otherwise put the connection back.
     if (loading && same(loading)) {
@@ -203,8 +215,12 @@
     // A token still in the form would let Connect bring the shelf back.
     const typed = splitToken(url);
     if (typed.token && same({ url, username: shelf.username })) url = typed.url;
-    await forgetShelf(shelf.url);
+    await forgetShelf(shelf.url, root ? shelf : undefined);
     saved = await shelves();
+    notice =
+      root && others
+        ? `Forgot ${shelf.title} and its saved shelves.`
+        : `Forgot ${shelf.title}.`;
   }
   function browse(link: Link) {
     if (!connection) return;

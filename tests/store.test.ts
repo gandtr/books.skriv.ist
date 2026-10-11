@@ -229,3 +229,73 @@ it('scrubs a legacy token from the catalogue URLs stored with a book', async () 
   expect(stored.remote).toEqual(plain);
   expect(stored).toMatchObject({ status: 'reading', progress: 0.4 });
 });
+
+const P = 'https://p.example/opds/v1.2/catalog';
+const SAGA = 'https://p.example/opds/v1.2/series/3';
+const MINE = 'https://p.example/opds/v1.2/recent';
+const Q = 'https://q.example/opds';
+const connectionShelves = async () => {
+  await saveShelf({
+    url: P,
+    title: 'Library',
+    username: '',
+    connectionUrl: P,
+    token: 'A',
+  });
+  await saveShelf({
+    url: SAGA,
+    title: 'Saga',
+    username: '',
+    connectionUrl: P,
+    token: 'A',
+  });
+  await saveShelf({
+    url: MINE,
+    title: 'Mine',
+    username: 'me',
+    connectionUrl: P,
+  });
+  await saveShelf({
+    url: Q,
+    title: 'Other',
+    username: '',
+    connectionUrl: Q,
+    token: 'X',
+  });
+};
+it('keeps one token per connection: re-pairing updates every shelf saved from the catalogue', async () => {
+  await connectionShelves();
+  await saveShelf({
+    url: P,
+    title: 'Library',
+    username: '',
+    connectionUrl: P,
+    token: 'B',
+  });
+  const tokens = Object.fromEntries(
+    (await shelves()).map((s) => [s.url, s.token]),
+  );
+  expect(tokens).toEqual({
+    [P]: 'B',
+    [SAGA]: 'B',
+    [MINE]: undefined,
+    [Q]: 'X',
+  });
+});
+it('forgetting a catalogue forgets the shelves saved from it; a sub-shelf alone goes alone', async () => {
+  await connectionShelves();
+  await forgetShelf(SAGA);
+  expect((await shelves()).map((s) => s.url).sort()).toEqual(
+    [MINE, P, Q].sort(),
+  );
+  await saveShelf({
+    url: SAGA,
+    title: 'Saga',
+    username: '',
+    connectionUrl: P,
+    token: 'A',
+  });
+  await forgetShelf(P, { connectionUrl: P, username: '' });
+  // Mine is the same catalogue under another login: another connection.
+  expect((await shelves()).map((s) => s.url).sort()).toEqual([MINE, Q].sort());
+});

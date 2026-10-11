@@ -8,6 +8,7 @@ import {
   splitToken,
   savedConnection,
   rememberConnection,
+  forgetConnection,
 } from '../src/lib/opds';
 afterEach(() => vi.unstubAllGlobals());
 describe('OPDS', () => {
@@ -341,5 +342,25 @@ describe('Armarium path tokens', () => {
     expect(
       savedConnection('https://b.example/opds/v1.2/catalog', '')?.token,
     ).toBeUndefined();
+  });
+  it('keeps two catalogues on one server apart: a session belongs to its connection URL', () => {
+    const calibre = 'https://nas.example/calibre/opds';
+    const armarium = 'https://nas.example/armarium/opds/v1.2/catalog';
+    rememberConnection({
+      url: calibre,
+      username: '',
+      password: '',
+      token: 'tok-calibre',
+    });
+    rememberConnection({
+      url: armarium,
+      username: '',
+      password: '',
+      token: 'tok-armarium',
+    });
+    expect(savedConnection(calibre, '')?.token).toBe('tok-calibre');
+    forgetConnection(armarium, '');
+    expect(savedConnection(armarium, '')?.token).toBeUndefined();
+    expect(savedConnection(calibre, '')?.token).toBe('tok-calibre');
   });
 });

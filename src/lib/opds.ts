@@ -245,11 +245,14 @@ export async function getBookFile(
   );
 }
 
-// Passwords stay in memory, scoped to their exact account and origin. A pairing
-// token is remembered here too; the saved shelf keeps its own copy on the device.
+// Passwords stay in memory, scoped to their catalogue connection and account, so two
+// catalogues on one server never share or clear each other's. A pairing token is
+// remembered here too; the saved shelves keep their own copy on the device.
 const sessions = new Map<string, Connection>();
 const sessionKey = (url: string, username: string) =>
-  new URL(url).origin + '\n' + username;
+  plainRequest(url, { url, username, password: '' }).connection.url +
+  '\n' +
+  username;
 export function rememberConnection(connection: Connection) {
   sessions.set(sessionKey(connection.url, connection.username), {
     ...connection,

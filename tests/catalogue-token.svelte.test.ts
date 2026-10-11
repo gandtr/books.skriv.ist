@@ -3,7 +3,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import Catalogue from '../src/components/Catalogue.svelte';
 import { db } from '../src/lib/store';
 import { shelves, forgetShelf } from '../src/lib/shelves';
-import { forgetConnection, savedConnection } from '../src/lib/opds';
+import {
+  forgetConnection,
+  rememberConnection,
+  savedConnection,
+} from '../src/lib/opds';
+import { saveShelf } from '../src/lib/shelves';
 
 const TOKEN = 'tok_en-123';
 const PAIRED = `https://a.example/opds/t/${TOKEN}/v1.2/catalog`;
@@ -345,4 +350,49 @@ it('keeps Basic-auth catalogues unchanged', async () => {
     username: 'reader',
     title: 'Library',
   });
+});
+
+it("opens a saved shelf with the shelf's own token, even when this page remembers another", async () => {
+  // Another tab paired again: the stored shelves hold its token, this page still remembers the old one.
+  const RECENT = 'https://a.example/opds/v1.2/recent';
+  await saveShelf({
+    url: RECENT,
+    title: 'Recent',
+    username: '',
+    connectionUrl: PLAIN,
+    token: 'tok-new',
+  });
+  rememberConnection({
+    url: PLAIN,
+    username: '',
+    password: '',
+    token: 'tok-old',
+  });
+  mountCatalogue('');
+  await settle();
+  button(/Recent/).click();
+  await settle();
+  expect(requests).toEqual([{ url: RECENT, authorization: 'Bearer tok-new' }]);
+});
+
+it('forgetting a catalogue forgets the shelves saved from it, and says so', async () => {
+  mountCatalogue();
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  button(/Browse/).click();
+  await settle();
+  button(/Save this shelf/).click();
+  await settle();
+  expect((await shelves()).map((s) => s.title).sort()).toEqual([
+    'Library',
+    'Recent',
+  ]);
+  (
+    target.querySelector('[aria-label="Forget Library"]') as HTMLButtonElement
+  ).click();
+  await settle();
+  expect(await shelves()).toEqual([]);
+  expect(target.querySelector('[role=status]')?.textContent).toContain(
+    'Forgot Library and its saved shelves.',
+  );
 });

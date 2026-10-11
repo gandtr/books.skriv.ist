@@ -131,7 +131,6 @@
     // a token in the typed URL is that connection's, whatever the login fields hold.
     const typed = splitToken(pairingTarget(url)).token;
     url = heldPairing(url);
-    const conn: Connection = { url, username, password };
     const shelf =
       pendingShelf &&
       pendingShelf.connectionUrl === url &&
@@ -141,9 +140,8 @@
     // A paired form shows the plain URL: the token comes from a pairing applied
     // here, this session or the shelf. A typed password is a login and wins; a
     // username alone does not log in to Armarium, so it keeps the held pairing.
-    if (typed) conn.token = typed;
-    else if (!password) {
-      let token: string | undefined;
+    let token: string | undefined = typed;
+    if (!token && !password) {
       try {
         token =
           pairedToken(url, '') ||
@@ -153,8 +151,12 @@
         // Not a URL: load() reports it.
       }
       token ||= shelf?.token;
-      if (token) conn.token = token;
     }
+    // A pairing is a token connection: a username left in the form does not ride
+    // along, so its shelves stay one connection (one token, forgotten together).
+    const conn: Connection = token
+      ? { url, username: '', password: '', token }
+      : { url, username, password };
     pendingShelf = undefined;
     load(shelf ? shelf.url : url, conn);
   }

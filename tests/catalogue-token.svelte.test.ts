@@ -517,3 +517,17 @@ it('a pairing link applied in this page wins over the token a listed shelf still
   await settle();
   expect(requests).toEqual([{ url: RECENT, authorization: 'Bearer tok-new' }]);
 });
+
+it('a token connection drops a username left in the form, so its shelves stay one connection', async () => {
+  mountCatalogue('');
+  typeInto(usernameField(), 'reader');
+  typeInto(
+    urlField(),
+    `https://books.skriv.ist/#opds=${encodeURIComponent(PAIRED)}`,
+  );
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  expect((await shelves()).map((s) => [s.url, s.username, s.token])).toEqual([
+    [PLAIN, '', TOKEN],
+  ]);
+});

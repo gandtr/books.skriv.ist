@@ -82,21 +82,25 @@ function plainShelf(shelf: Shelf): Shelf {
     return shelf;
   }
 }
-// Legacy shelves rewritten to plain URLs; shelves that become the same one merge,
-// keeping a token. Pure: the stored records are not modified.
+// Legacy shelves rewritten to plain URLs. Shelves already plain are kept as they are;
+// a legacy row only fills a URL no plain shelf holds, and gives its token only to a
+// shelf of the same login that has none. Pure: the stored records are not modified.
 function planShelves(stored: Shelf[]): { result: Shelf[]; changed: boolean } {
   const plain = new Map<string, Shelf>();
-  let changed = false;
+  const legacy: Shelf[] = [];
   for (const shelf of stored) {
     const next = plainShelf(shelf);
-    if (next.url !== shelf.url || next.connectionUrl !== shelf.connectionUrl)
-      changed = true;
-    const same = plain.get(next.url);
-    if (!same) plain.set(next.url, next);
-    else if (!same.token && next.token)
-      plain.set(next.url, { ...same, token: next.token });
+    if (next.url === shelf.url && next.connectionUrl === shelf.connectionUrl)
+      plain.set(next.url, next);
+    else legacy.push(next);
   }
-  return { result: [...plain.values()], changed };
+  for (const next of legacy) {
+    const kept = plain.get(next.url);
+    if (!kept) plain.set(next.url, next);
+    else if (!kept.token && next.token && kept.username === next.username)
+      plain.set(next.url, { ...kept, token: next.token });
+  }
+  return { result: [...plain.values()], changed: legacy.length > 0 };
 }
 export async function shelves(): Promise<Shelf[]> {
   if (isDesktop()) {

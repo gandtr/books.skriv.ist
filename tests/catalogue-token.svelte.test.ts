@@ -396,3 +396,22 @@ it('forgetting a catalogue forgets the shelves saved from it, and says so', asyn
     'Forgot Library and its saved shelves.',
   );
 });
+
+it('sends a password typed without a username as that login, over a token held for the URL', async () => {
+  rememberConnection({ url: PLAIN, username: '', password: '', token: TOKEN });
+  mountCatalogue('');
+  const type = (input: HTMLInputElement, value: string) => {
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  type(urlField(), PLAIN);
+  type(
+    target.querySelector<HTMLInputElement>('input[type=password]')!,
+    'typed',
+  );
+  urlField().closest('form')!.requestSubmit();
+  await settle();
+  expect(requests).toEqual([
+    { url: PLAIN, authorization: `Basic ${btoa(':typed')}` },
+  ]);
+});

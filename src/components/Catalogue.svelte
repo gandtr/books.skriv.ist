@@ -119,8 +119,8 @@
         ? pendingShelf
         : undefined;
     // A paired form shows the plain URL: the token comes from this session or
-    // from the shelf, unless a fresh token URL was just typed.
-    if (!splitToken(url).token) {
+    // from the shelf, unless a fresh token URL or a password was just typed.
+    if (!splitToken(url).token && !password) {
       let token: string | undefined;
       try {
         token = savedConnection(url, username)?.token;

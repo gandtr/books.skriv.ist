@@ -19,9 +19,16 @@ const TOKEN_PATH = /^\/opds\/t\/([^/]+)(\/.*)?$/;
 export function splitToken(value: string): { url: string; token: string } {
   try {
     const url = new URL(value);
-    const match = TOKEN_PATH.exec(url.pathname);
-    if (!match || !['http:', 'https:'].includes(url.protocol))
+    if (!['http:', 'https:'].includes(url.protocol))
       return { url: value, token: '' };
+    // Armarium also takes ?token=: it moves out the same way, other parameters stay.
+    const query = url.searchParams.get('token') || '';
+    if (query) url.searchParams.delete('token');
+    const match = TOKEN_PATH.exec(url.pathname);
+    if (!match)
+      return query
+        ? { url: url.href, token: query }
+        : { url: value, token: '' };
     url.pathname = '/opds' + (match[2] ?? '');
     let token = match[1];
     try {
@@ -89,7 +96,8 @@ function headers(url: string, connection: Connection): Headers {
   if (new URL(url).origin !== new URL(connection.url).origin) return result;
   if (connection.token)
     result.set('Authorization', `Bearer ${connection.token}`);
-  else if (connection.username) {
+  // A password alone is a login too: Armarium takes its token as the Basic password.
+  else if (connection.username || connection.password) {
     const bytes = new TextEncoder().encode(
       `${connection.username}:${connection.password}`,
     );

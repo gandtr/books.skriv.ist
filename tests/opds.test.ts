@@ -147,6 +147,38 @@ describe('Armarium path tokens', () => {
       token: 'a/b c',
     });
   });
+  it('moves a ?token= value out of the URL too, keeping the other parameters', () => {
+    expect(splitToken('https://nas.example/opds/v1.2/catalog?token=T')).toEqual(
+      {
+        url: 'https://nas.example/opds/v1.2/catalog',
+        token: 'T',
+      },
+    );
+    expect(
+      splitToken('https://nas.example/opds/v1.2/catalog?page=2&token=T#x'),
+    ).toEqual({
+      url: 'https://nas.example/opds/v1.2/catalog?page=2#x',
+      token: 'T',
+    });
+    // The path form wins, and no token stays in the URL either way.
+    expect(
+      splitToken(`https://nas.example/opds/t/${TOKEN}/v1.2/catalog?token=Q`),
+    ).toEqual({ url: 'https://nas.example/opds/v1.2/catalog', token: TOKEN });
+  });
+  it('sends a password without a username as Basic, as Armarium accepts a token that way', async () => {
+    const fetcher = vi.fn(
+      async (_url: string, _init?: RequestInit) => new Response('ok'),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    await fetchLimited(
+      'https://nas.example/opds',
+      { url: 'https://nas.example/opds', username: '', password: 'T' },
+      10,
+    );
+    expect(
+      (fetcher.mock.calls[0][1]!.headers as Headers).get('Authorization'),
+    ).toBe(`Basic ${btoa(':T')}`);
+  });
   it('leaves every other URL alone', () => {
     for (const url of [
       'https://a.example/opds/v1.2/catalog',

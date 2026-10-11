@@ -167,6 +167,23 @@ it('deletes the token with the shelf', async () => {
   expect(await shelves()).toEqual([]);
   expect(await rawAll('shelves')).toEqual([]);
 });
+it('keeps a Basic shelf over a legacy pairing of the same catalogue, without taking its token', async () => {
+  await rawPut('shelves', {
+    url: LEGACY,
+    connectionUrl: LEGACY,
+    username: '',
+    title: 'Old pairing',
+  });
+  await rawPut('shelves', {
+    url: PLAIN,
+    connectionUrl: PLAIN,
+    username: 'reader',
+    title: 'Mine',
+  });
+  expect(await shelves()).toEqual([
+    { url: PLAIN, connectionUrl: PLAIN, username: 'reader', title: 'Mine' },
+  ]);
+});
 it('moves a legacy token out of a shelf URL and rewrites the stored record', async () => {
   await rawPut('shelves', {
     url: LEGACY,

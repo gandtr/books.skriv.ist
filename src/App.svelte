@@ -327,7 +327,7 @@
           <h2>Just you and your books.</h2>
           <p>
             Skrivist Books reads EPUB and PDF files on your device. No account,
-            cloud library, or uploads. It is separate from app.skriv.ist. {#if !isDesktop()}Page visits are counted with cookie-free Cloudflare Web Analytics.{/if}
+            cloud library, or uploads. {#if !isDesktop()}Page visits are counted with cookie-free Cloudflare Web Analytics.{/if}
           </p>
           <p>
             {storage}. {#if isDesktop()}Keep copies of your original files as a backup.{:else}Browser storage can be cleared or evicted, so keep your original files.{/if} Reading positions belong to this installation and do not

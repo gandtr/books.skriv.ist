@@ -87,7 +87,8 @@
   }
   async function read(book: Book) {
     initialPosition = undefined;
-    active = book;
+    // The list copy can be older than the stored position (left with Back).
+    active = (await getBook(book.id).catch(() => undefined)) ?? book;
     location.hash = `read=${book.id}`;
   }
   function close() {
@@ -98,6 +99,13 @@
   // reopening Catalogues later never replays it.
   let pairing = { url: '', id: 0 };
   async function route() {
+    const open = active;
+    await applyRoute();
+    // A reader left through the route (browser Back) saved progress the list
+    // has not seen yet.
+    if (open && active?.id !== open.id) await refresh();
+  }
+  async function applyRoute() {
     // A pairing link from Armarium wins over a reading link in the same fragment.
     const link = takeOpdsLink();
     if (link) {

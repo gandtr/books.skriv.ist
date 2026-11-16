@@ -35,9 +35,22 @@ export interface CalibreLink {
   /** The connected folder it was last opened from. */
   folder: string;
 }
-export const calibreBookId = (
+/**
+ * The library ID of a linked book: derived from Calibre's library and book
+ * IDs rather than from the file, and shaped like every other book ID (64 hex
+ * digits), which reading links and exported notes rely on.
+ */
+export async function calibreBookId(
   link: Pick<CalibreLink, 'library' | 'book' | 'format'>,
-) => `calibre:${link.library}:${link.book}:${link.format}`;
+): Promise<string> {
+  const key = new TextEncoder().encode(
+    `calibre:${link.library}:${link.book}:${link.format}`,
+  );
+  return Array.from(
+    new Uint8Array(await crypto.subtle.digest('SHA-256', key)),
+    (b) => b.toString(16).padStart(2, '0'),
+  ).join('');
+}
 export interface Book {
   id: string;
   title: string;

@@ -207,7 +207,7 @@
       path,
       folder: from.folder!,
     };
-    const id = calibreBookId(link);
+    const id = await calibreBookId(link);
     // Checked before anything is added. The file itself is read by the reader.
     const original = await calibreStat(link.folder, path);
     if (!original)

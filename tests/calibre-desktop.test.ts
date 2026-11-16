@@ -10,6 +10,7 @@ import {
   sourceFromHost,
 } from '../src/lib/calibre-source';
 import { calibreFile } from '../src/lib/desktop';
+import { parseReadingRoute } from '../src/lib/notes';
 import {
   calibreBookId,
   getFile,
@@ -144,7 +145,7 @@ const link = {
   folder: 'f1',
 };
 const linked: Book = {
-  id: calibreBookId(link),
+  id: await calibreBookId(link),
   title: 'Title',
   author: 'Writer',
   format: 'epub',
@@ -156,8 +157,13 @@ const linked: Book = {
   calibre: link,
 };
 
-it('keys a linked book to the Calibre book, not to its file', () => {
-  expect(linked.id).toBe('calibre:lib-uuid:7:epub');
+it('keys a linked book to the Calibre book, in the shape reading links accept', async () => {
+  expect(linked.id).toMatch(/^[a-f0-9]{64}$/);
+  expect(parseReadingRoute(`#read=${linked.id}`)).toEqual({ id: linked.id });
+  // The same Calibre book is the same library book wherever its file is now.
+  expect(await calibreBookId({ ...link, path: 'elsewhere.epub' } as never)).toBe(linked.id);
+  expect(await calibreBookId({ ...link, book: 8 })).not.toBe(linked.id);
+  expect(await calibreBookId({ ...link, format: 'pdf' })).not.toBe(linked.id);
 });
 
 it('opens a linked book from its Calibre folder without a stored file', async () => {

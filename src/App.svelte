@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import DesktopZoom from './components/DesktopZoom.svelte';
-  import { isDesktop, watchNativeFiles } from './lib/desktop';
+  import LibraryFolder from './components/LibraryFolder.svelte';
+  import { isDesktop, libraryLocation, watchNativeFiles } from './lib/desktop';
   import { registerSW } from 'virtual:pwa-register';
   import BookCard from './components/BookCard.svelte';
   import ConfirmDialog from './components/ConfirmDialog.svelte';
@@ -148,6 +149,8 @@
   onMount(() => {
     let disposed = false;
     let stopNative = () => {};
+    // Say so when this launch moved the library or could not use its chosen folder.
+    if (isDesktop()) void libraryLocation().then(place => { if (place.notice && !disposed) notice = place.notice; }).catch(() => {});
     if (isDesktop()) void watchNativeFiles(nativeAdd, fragment => { location.hash = fragment; }, message => { error = message; }).then(stop => { if (disposed) stop(); else stopNative = stop; });
     // Blocked site storage throws; the library's own error says why.
     try {
@@ -359,6 +362,7 @@
             {storage}. {#if isDesktop()}Keep copies of your original files as a backup.{:else}Browser storage can be cleared or evicted, so keep your original files.{/if} Reading positions belong to this installation and do not
             sync to other devices.
           </p>
+          {#if isDesktop()}<LibraryFolder disabled={busy} />{/if}
           <div class="info-links">
             <a href="https://skriv.ist/" target="_blank" rel="noopener noreferrer">skriv.ist ↗</a>
             <a href="https://gand.tr/" target="_blank" rel="noopener noreferrer">gand.tr ↗</a>

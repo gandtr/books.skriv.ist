@@ -111,3 +111,30 @@ export async function watchNativeFiles(
 export function onDownloadResult(callback: (saved: boolean) => void): void {
   window.addEventListener('skrivist-download-result', event => callback((event as CustomEvent<{ success?: unknown } | null>).detail?.success === true), { once: true });
 }
+
+/** Where the desktop library is stored. Paths come from the host; the page never supplies one. */
+export interface LibraryLocation {
+  /** False where the host keeps the library in the app's own data (macOS). */
+  configurable: boolean;
+  path: string;
+  defaultPath: string | null;
+  isDefault: boolean;
+  /** Stored in the app's private data, which Windows removes on uninstall. */
+  private: boolean;
+  /** Inside a OneDrive folder. */
+  cloud: boolean;
+  notice: string | null;
+  migratedFrom: string | null;
+  /** An earlier copy left in the app's private data. */
+  previousPath: string | null;
+}
+export async function libraryLocation(): Promise<LibraryLocation> {
+  return await invoke<LibraryLocation>('library_location');
+}
+/** Opens the system folder picker in the host. Resolves to null when cancelled. */
+export async function chooseLibraryFolder(): Promise<LibraryLocation | null> {
+  return await invoke<LibraryLocation | null>('library_choose_folder');
+}
+export async function openLibraryFolder(): Promise<void> {
+  await invoke('library_open_folder');
+}

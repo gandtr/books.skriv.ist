@@ -1,4 +1,4 @@
-import { unzip, unzipSync, strFromU8 } from 'fflate';
+import { Inflate, unzipSync, strFromU8 } from 'fflate';
 import DOMPurify from 'dompurify';
 
 const MAX_RESOURCE = 24 * 1024 * 1024;
@@ -42,6 +42,85 @@ function xhtmlBody(text: string): Element | undefined {
     );
   return body;
 }
+interface ZipEntry {
+  method: number;
+  start: number;
+  size: number;
+  originalSize: number;
+}
+// Where each entry's data starts, read from the central directory the same
+// way fflate's unzipSync reads it (open() has already validated it there).
+function zipEntries(bytes: Uint8Array): Map<string, ZipEntry> {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const u16 = (at: number) => view.getUint16(at, true);
+  const u32 = (at: number) => view.getUint32(at, true);
+  const u64 = (at: number) => u32(at) + u32(at + 4) * 2 ** 32;
+  const MAX = 0xffffffff;
+  let end = bytes.length - 22;
+  while (u32(end) !== 0x06054b50) end--;
+  let count = u16(end + 8),
+    at = u32(end + 16);
+  if (end >= 20 && u32(end - 20) === 0x07064b50) {
+    const zip64 = u32(end - 12);
+    if (u32(zip64) === 0x06064b50) {
+      count = u32(zip64 + 32);
+      at = u32(zip64 + 48);
+    }
+  }
+  const entries = new Map<string, ZipEntry>();
+  for (let i = 0; i < count; i++) {
+    const nameEnd = at + 46 + u16(at + 28),
+      extraEnd = nameEnd + u16(at + 30);
+    let size = u32(at + 20),
+      originalSize = u32(at + 24),
+      offset = u32(at + 42);
+    for (let x = nameEnd; x + 4 < extraEnd; x += 4 + u16(x + 2)) {
+      if (u16(x) !== 1) continue;
+      let field = x + 4;
+      if (originalSize === MAX) ((originalSize = u64(field)), (field += 8));
+      if (size === MAX) ((size = u64(field)), (field += 8));
+      if (offset === MAX) offset = u64(field);
+      break;
+    }
+    entries.set(
+      strFromU8(bytes.subarray(at + 46, nameEnd), !(u16(at + 8) & 2048)),
+      {
+        method: u16(at + 10),
+        start: offset + 30 + u16(offset + 26) + u16(offset + 28),
+        size,
+        originalSize,
+      },
+    );
+    at = extraEnd + u16(at + 32);
+  }
+  return entries;
+}
+const TOO_LARGE = 'This EPUB expands beyond the safe size limit.';
+// The declared size cannot be trusted: inflate in small slices (deflate
+// expands at most ~1032x, so 16 KiB yields at most ~17 MB) and stop as soon
+// as the output passes the limit, yielding to the page between megabytes.
+async function inflateLimited(
+  data: Uint8Array,
+  limit: number,
+): Promise<Uint8Array> {
+  const SLICE = 16 * 1024;
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const inflater = new Inflate((chunk) => {
+    total += chunk.length;
+    if (total <= limit) chunks.push(chunk);
+  });
+  for (let at = 0; at < data.length; at += SLICE) {
+    inflater.push(data.subarray(at, at + SLICE), at + SLICE >= data.length);
+    if (total > limit) throw new Error(TOO_LARGE);
+    if ((at / SLICE) % 64 === 63) await new Promise((r) => setTimeout(r));
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks)
+    out.set(chunk, (offset += chunk.length) - chunk.length);
+  return out;
+}
 function local(doc: Document | Element, name: string): Element[] {
   return Array.from(doc.getElementsByTagNameNS('*', name));
 }
@@ -77,7 +156,7 @@ export function resolvePath(value: string, base = ''): string {
 export class Epub {
   private constructor(
     private bytes: Uint8Array,
-    private names: Set<string>,
+    private entries: Map<string, ZipEntry>,
   ) {}
   info!: EpubInfo;
   private urls = new Map<string, string>();
@@ -99,28 +178,31 @@ export class Epub {
           entry.originalSize > MAX_RESOURCE ||
           (total += entry.originalSize) > 512 * 1024 * 1024
         )
-          throw new Error('This EPUB expands beyond the safe size limit.');
+          throw new Error(TOO_LARGE);
         names.add(entry.name);
         return false;
       },
     });
-    const epub = new Epub(bytes, names);
+    const epub = new Epub(bytes, zipEntries(bytes));
     await epub.metadata();
     return epub;
   }
   async read(path: string): Promise<Uint8Array> {
-    if (!this.names.has(path))
-      throw new Error(`Missing EPUB resource: ${path}`);
-    return new Promise((resolve, reject) =>
-      unzip(
-        this.bytes,
-        { filter: (entry) => entry.name === path },
-        (error, files) =>
-          error
-            ? reject(new Error('This EPUB could not be unpacked.'))
-            : resolve(files[path]),
-      ),
-    );
+    const entry = this.entries.get(path);
+    if (!entry) throw new Error(`Missing EPUB resource: ${path}`);
+    const data = this.bytes.subarray(entry.start, entry.start + entry.size);
+    const limit = Math.min(entry.originalSize, MAX_RESOURCE);
+    if (entry.method === 0) {
+      if (data.length > limit) throw new Error(TOO_LARGE);
+      return data.slice();
+    }
+    if (entry.method !== 8) throw new Error('This EPUB could not be unpacked.');
+    try {
+      return await inflateLimited(data, limit);
+    } catch (e) {
+      if ((e as Error).message === TOO_LARGE) throw e;
+      throw new Error('This EPUB could not be unpacked.');
+    }
   }
   async text(path: string) {
     return strFromU8(await this.read(path));

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { unzipSync, zipSync } from 'fflate';
 import { Epub, resolvePath } from '../src/lib/epub';
 import { epubFile } from './fixtures';
 describe('EPUB', () => {
@@ -260,5 +261,57 @@ describe('chapter sanitiser', () => {
     expect(fragment.querySelector('img')).toBeNull();
     expect(fragment.textContent).not.toContain('aaaaaaaaaa');
     expectClean(fragment);
+  });
+});
+
+// A ZIP declares each entry's size in its central directory; a deflate bomb
+// declares a few bytes and inflates to far more.
+describe('ZIP sizes', () => {
+  const bytesOf = async (file: Blob) =>
+    new Uint8Array(await file.arrayBuffer());
+  const declare = (zip: Uint8Array, name: string, size: number) => {
+    const view = new DataView(zip.buffer);
+    const encoded = new TextEncoder().encode(name);
+    for (let at = 0; at + 46 < zip.length; at++) {
+      if (view.getUint32(at, true) !== 0x02014b50) continue;
+      const length = view.getUint16(at + 28, true);
+      const found = zip.subarray(at + 46, at + 46 + length);
+      if (
+        found.length === encoded.length &&
+        found.every((b, i) => b === encoded[i])
+      ) {
+        view.setUint32(at + 24, size, true);
+        return zip;
+      }
+    }
+    throw new Error(`No central directory entry for ${name}`);
+  };
+  it('stops inflating an entry that grows past its declared size', async () => {
+    const zip = declare(
+      await bytesOf(epubFile({}, `<p>${'x'.repeat(4 * 1024 * 1024)}</p>`)),
+      'OPS/one.xhtml',
+      64,
+    );
+    const book = await Epub.open(zip);
+    await expect(book.chapter(0)).rejects.toThrow('safe size limit');
+    // Honest entries in the same book still read.
+    expect((await book.chapter(1)).textContent).toContain('The last page.');
+    book.close();
+  });
+  it('reads stored (uncompressed) entries', async () => {
+    const files = unzipSync(await bytesOf(epubFile()));
+    const stored = zipSync(files, { level: 0 });
+    const book = await Epub.open(stored as Uint8Array<ArrayBuffer>);
+    expect(book.info.sections.map((s) => s.title)).toEqual([
+      'Morning',
+      'Evening',
+    ]);
+    expect((await book.chapter(0)).textContent).toContain('A quiet morning');
+    book.close();
+    await expect(
+      Epub.open(
+        declare(stored, 'OPS/package.opf', 16) as Uint8Array<ArrayBuffer>,
+      ),
+    ).rejects.toThrow('safe size limit');
   });
 });

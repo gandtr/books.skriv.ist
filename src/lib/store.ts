@@ -1,4 +1,11 @@
-import { isDesktop, native, nativeGet } from './desktop';
+import {
+  calibreFile,
+  calibreFolders,
+  isDesktop,
+  native,
+  nativeGet,
+} from './desktop';
+import { MAX_BOOK } from './epub';
 import { plainRequest } from './opds';
 export type Status = 'unread' | 'reading' | 'read';
 export interface Position {
@@ -12,6 +19,25 @@ export interface Remote {
   connectionUrl: string;
   username: string;
 }
+/**
+ * A book read in place from a Calibre library (desktop only). The file stays
+ * in Calibre; the reading position and notes are kept here, keyed to Calibre's
+ * book ID so they survive the file being renamed or converted again.
+ */
+export interface CalibreLink {
+  /** Calibre's library ID, or `folder-<id>` for a database without one. */
+  library: string;
+  /** Calibre's book ID. */
+  book: number;
+  format: 'epub' | 'pdf';
+  /** The file, relative to the library root, when the book was last opened. */
+  path: string;
+  /** The connected folder it was last opened from. */
+  folder: string;
+}
+export const calibreBookId = (
+  link: Pick<CalibreLink, 'library' | 'book' | 'format'>,
+) => `calibre:${link.library}:${link.book}:${link.format}`;
 export interface Book {
   id: string;
   title: string;
@@ -23,6 +49,7 @@ export interface Book {
   progress: number;
   position: Position;
   remote?: Remote;
+  calibre?: CalibreLink;
 }
 let opening: Promise<IDBDatabase> | undefined;
 let connection: IDBDatabase | undefined;
@@ -175,8 +202,40 @@ export async function getBook(id: string): Promise<Book | undefined> {
   // listBooks() rewrites stored remotes; a book opened by link may be read first.
   return book?.remote ? { ...book, remote: plainRemote(book.remote) } : book;
 }
+const TOO_LARGE = 'Choose a book smaller than 128 MB.';
+/**
+ * The file of a book that lives in a Calibre library. Tries the folder it was
+ * last opened from, then every other connected folder: the path contains
+ * Calibre's book ID, so the same path in a moved or re-connected library is
+ * the same book.
+ */
+async function calibreBookFile(link: CalibreLink): Promise<Blob> {
+  let failure: unknown;
+  try {
+    return await calibreFile(link.folder, link.path, MAX_BOOK, TOO_LARGE);
+  } catch (e) {
+    if ((e as Error).message === TOO_LARGE) throw e;
+    failure = e;
+  }
+  for (const folder of await calibreFolders().catch(() => [])) {
+    if (folder.id === link.folder || !folder.available) continue;
+    try {
+      return await calibreFile(folder.id, link.path, MAX_BOOK, TOO_LARGE);
+    } catch {}
+  }
+  throw new Error(
+    failure instanceof DOMException && failure.name === 'NotFoundError'
+      ? 'This book is no longer where Calibre kept it. Open it again from the Calibre tab; your notes and reading position are kept.'
+      : 'This book is in a Calibre library that is not connected or not reachable right now. Connect it again in the Calibre tab; your notes and reading position are kept.',
+  );
+}
 export async function getFile(id: string): Promise<Blob | undefined> {
-  if (isDesktop()) return nativeGet('files', id);
+  if (isDesktop()) {
+    const stored = await nativeGet<Blob>('files', id);
+    if (stored) return stored;
+    const book = await nativeGet<Book>('books', id);
+    return book?.calibre ? calibreBookFile(book.calibre) : undefined;
+  }
   return request((await transaction('files')).objectStore('files').get(id));
 }
 export async function getCover(id: string): Promise<Blob | undefined> {
@@ -210,6 +269,15 @@ export async function addBook(
   };
   await finished;
   return result;
+}
+/**
+ * Adds a Calibre book to the library without copying its file, or refreshes
+ * the link, title and author of one already there. Desktop only.
+ */
+export async function linkBook(book: Book, cover?: Blob): Promise<Book> {
+  if (!isDesktop() || !book.calibre)
+    throw new Error('Reading in place needs the desktop app.');
+  return native('books_link', { book, cover });
 }
 export async function updateBook(
   id: string,

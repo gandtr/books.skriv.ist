@@ -39,6 +39,10 @@ On browsers supporting the File System Access API, folder access is read-only an
 
 Use **Refresh library** after changing metadata in Calibre (close Calibre again first). The compatible picker asks you to select the folder again for a fresh snapshot. Database snapshots are limited to 64 MB; pending SQLite WAL/journal files are rejected to avoid displaying an incomplete snapshot. Path traversal outside the selected root is rejected. A missing or moved book reports an error rather than searching other folders. For larger or remotely hosted libraries, use Calibre's OPDS feed through **Catalogues** instead.
 
+### Windows desktop app: read in place
+
+In the Windows desktop app, **Calibre → Connect a Calibre library…** opens the system folder picker and the app remembers the folder. **Read EPUB / Read PDF** then opens the book straight from the Calibre folder: nothing is copied into the Skrivist library, and Calibre's files and database are never written. The book appears in **Library** marked *Calibre*, with its reading position and notes kept in the Skrivist library and keyed to Calibre's library and book IDs, so they survive Calibre renaming the file or the library folder moving. A linked book can be read only while its Calibre folder is reachable; **Remove** deletes the record, position and notes and leaves the Calibre file alone. **Forget** drops a connected folder from the app without touching it. Connected folders are listed in `%USERPROFILE%\Skrivist\books.calibre.json`. The page never names a path outside a connected folder: the host serves bounded, read-only ranges of `metadata.db`, covers and EPUB/PDF files inside it. Browsers and the macOS app keep the copy-on-read behaviour above.
+
 ## OPDS
 
 Add your own OPDS 1 (Atom) or OPDS 2 catalogue in **Catalogues**. Save connections and individual shelves. Browse 24 entries at a time; server pagination is followed only when needed. Book files download only when you press **Read book**, then remain available locally.

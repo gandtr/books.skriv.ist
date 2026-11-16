@@ -14,9 +14,12 @@ export interface CalibrePage {
   entries: CalibreEntry[];
   total: number;
   page: number;
+  /** Calibre's own ID for this library; absent in very old databases. */
+  library?: string;
 }
 export class CalibreDatabase {
   private db: Database;
+  private library?: string;
   constructor(SQL: SqlJsStatic, bytes: Uint8Array) {
     if (bytes.length > MAX_CALIBRE_DB)
       throw new Error('Choose a metadata.db smaller than 64 MB.');
@@ -52,6 +55,16 @@ export class CalibreDatabase {
         );
         if (columns.some((c) => !found.includes(c)))
           throw new Error('This Calibre database has an unsupported schema.');
+      }
+      // Stays the same when the library folder is moved or renamed.
+      if (
+        this.rows(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='library_id'",
+        ).length
+      ) {
+        const uuid = this.rows('SELECT uuid FROM library_id LIMIT 1')[0]?.uuid;
+        if (typeof uuid === 'string' && /^[0-9a-zA-Z-]{8,64}$/.test(uuid))
+          this.library = uuid;
       }
     } catch (e) {
       this.db.close();
@@ -132,7 +145,7 @@ export class CalibreDatabase {
         })),
       };
     });
-    return { entries, total, page };
+    return { entries, total, page, library: this.library };
   }
   close() {
     this.db.close();

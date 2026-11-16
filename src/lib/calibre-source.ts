@@ -1,8 +1,12 @@
 import { MAX_CALIBRE_DB } from './calibre-db';
+import { calibreFile, type CalibreFolder } from './desktop';
+import { MAX_BOOK } from './epub';
 export interface CalibreSource {
   name: string;
   snapshot: boolean;
   file: (path: string) => Promise<File>;
+  /** Set for a folder connected in the desktop host: books open in place, uncopied. */
+  folder?: string;
 }
 export function calibrePath(path: string): string[] {
   const parts = path.split('/');
@@ -71,6 +75,24 @@ export function sourceFromDirectory(root: ReadDirectory): CalibreSource {
       for (const part of parts.slice(0, -1))
         directory = await directory.getDirectoryHandle(part);
       return (await directory.getFileHandle(parts[parts.length - 1])).getFile();
+    },
+  };
+}
+
+/**
+ * A folder the desktop host remembers. Every read goes through the host, which
+ * only serves the database, covers and book files inside that folder.
+ */
+export function sourceFromHost(folder: CalibreFolder): CalibreSource {
+  return {
+    name: folder.name,
+    snapshot: false,
+    folder: folder.id,
+    file: async (path) => {
+      calibrePath(path);
+      return path.startsWith('metadata.db')
+        ? calibreFile(folder.id, path, MAX_CALIBRE_DB, 'Choose a metadata.db smaller than 64 MB.')
+        : calibreFile(folder.id, path, MAX_BOOK, 'Choose a book smaller than 128 MB.');
     },
   };
 }

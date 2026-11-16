@@ -32,7 +32,9 @@
       ></span><span class="cover-title">{book.title}</span><span
         class="cover-author">{book.author || 'Your collection'}</span
       >{/if}
-    <span class="format-label">{book.format.toUpperCase()}</span>
+    <span class="format-label"
+      >{book.format.toUpperCase()}{book.calibre ? ' · Calibre' : ''}</span
+    >
     {#if book.status !== 'unread'}<span
         class="cover-progress"
         style={`--progress:${book.status === 'read' ? 100 : book.progress * 100}%`}

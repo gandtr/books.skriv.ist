@@ -127,6 +127,8 @@ export interface LibraryLocation {
   migratedFrom: string | null;
   /** An earlier copy left in the app's private data. */
   previousPath: string | null;
+  /** The host can open books straight from Calibre library folders. */
+  calibre?: boolean;
 }
 export async function libraryLocation(): Promise<LibraryLocation> {
   return await invoke<LibraryLocation>('library_location');
@@ -137,4 +139,51 @@ export async function chooseLibraryFolder(): Promise<LibraryLocation | null> {
 }
 export async function openLibraryFolder(): Promise<void> {
   await invoke('library_open_folder');
+}
+
+/** A Calibre library folder the user connected in the host's folder picker. */
+export interface CalibreFolder {
+  id: string;
+  path: string;
+  name: string;
+  /** False while its drive or share is not reachable. */
+  available: boolean;
+}
+export async function calibreFolders(): Promise<CalibreFolder[]> {
+  return await invoke<CalibreFolder[]>('calibre_folders');
+}
+/** Opens the system folder picker in the host. Resolves to null when cancelled. */
+export async function addCalibreFolder(): Promise<CalibreFolder | null> {
+  return await invoke<CalibreFolder | null>('calibre_add_folder');
+}
+/** Forgets the folder in this app. Nothing in the folder is touched. */
+export async function forgetCalibreFolder(id: string): Promise<void> {
+  await invoke('calibre_forget', { id });
+}
+interface CalibreStat { size: number; modified: number }
+/** Size and modification time of a file in a connected Calibre folder, or null when it is missing. */
+export async function calibreStat(folder: string, path: string): Promise<CalibreStat | null> {
+  return await invoke<CalibreStat | null>('calibre_stat', { id: folder, path });
+}
+/**
+ * Reads one file from a connected Calibre folder, in bounded chunks, without
+ * copying it anywhere. `path` is relative to the library root, as Calibre's
+ * database records it. A missing file is a NotFoundError, like a missing file
+ * behind a browser folder handle.
+ */
+export async function calibreFile(folder: string, path: string, limit: number, tooLarge: string): Promise<File> {
+  const before = await calibreStat(folder, path);
+  if (!before) throw new DOMException(`File missing from the Calibre library: ${path}`, 'NotFoundError');
+  if (before.size > limit) throw new Error(tooLarge);
+  const parts: Uint8Array<ArrayBuffer>[] = [];
+  for (let offset = 0; offset < before.size; offset += CHUNK) {
+    const length = Math.min(CHUNK, before.size - offset);
+    const bytes = new Uint8Array(await invoke<ArrayBuffer | number[]>('calibre_read', { id: folder, path, offset, length }));
+    if (bytes.byteLength !== length) throw new Error('The Calibre file changed while it was being read. Try again.');
+    parts.push(bytes);
+  }
+  const after = await calibreStat(folder, path);
+  if (!after || after.size !== before.size || after.modified !== before.modified)
+    throw new Error('The Calibre file changed while it was being read. Try again.');
+  return new File(parts, path.slice(path.lastIndexOf('/') + 1), { lastModified: before.modified });
 }

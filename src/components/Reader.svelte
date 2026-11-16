@@ -81,7 +81,7 @@
       )
       .catch(() => {
         error =
-          'Your reading position could not be saved. Browser storage may be full.';
+          'Your reading position could not be saved. Try again, or reload the page.';
       });
   }
   function layout() {

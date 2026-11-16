@@ -1,7 +1,7 @@
 // Saved shelves: catalogue bookmarks, each with the connection it opens with.
 import { isDesktop, native, nativeGet } from './desktop';
 import { plainRequest } from './opds';
-import { db, done } from './store';
+import { done, transaction } from './store';
 
 export interface Shelf {
   url: string;
@@ -51,8 +51,7 @@ export async function saveShelf(shelf: Shelf) {
       });
     return;
   }
-  const d = await db(),
-    tx = d.transaction('shelves', 'readwrite'),
+  const tx = await transaction('shelves', 'readwrite'),
     finished = done(tx),
     store = tx.objectStore('shelves');
   store.put(record);
@@ -136,8 +135,7 @@ export async function shelves(): Promise<Shelf[]> {
     return result;
   }
   // One read-write transaction: rewriting old records must not race a save.
-  const d = await db(),
-    tx = d.transaction('shelves', 'readwrite'),
+  const tx = await transaction('shelves', 'readwrite'),
     finished = done(tx),
     store = tx.objectStore('shelves'),
     req = store.getAll();
@@ -168,8 +166,7 @@ export async function forgetShelf(
         await native('delete', { store: 'shelves', key: shelf.url });
     return;
   }
-  const d = await db(),
-    tx = d.transaction('shelves', 'readwrite'),
+  const tx = await transaction('shelves', 'readwrite'),
     finished = done(tx),
     store = tx.objectStore('shelves');
   store.delete(url);

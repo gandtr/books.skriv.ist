@@ -25,10 +25,19 @@ export interface Book {
   remote?: Remote;
 }
 let opening: Promise<IDBDatabase> | undefined;
+let connection: IDBDatabase | undefined;
+// The browser can close the connection (site data cleared, storage pressure,
+// WebKit losing its IndexedDB server); the next call opens a new one.
+function forget(d: IDBDatabase) {
+  if (connection !== d) return;
+  connection = undefined;
+  opening = undefined;
+}
 export function db(): Promise<IDBDatabase> {
   if (isDesktop())
     return Promise.reject(new Error('Desktop libraries use native storage.'));
   return (opening ??= new Promise((resolve, reject) => {
+    let blocked = false;
     const req = indexedDB.open('skrivist-books', 2);
     req.onupgradeneeded = () => {
       const db = req.result;
@@ -45,17 +54,41 @@ export function db(): Promise<IDBDatabase> {
         );
     };
     req.onsuccess = () => {
-      req.result.onversionchange = () => {
-        req.result.close();
-        opening = undefined;
+      const d = req.result;
+      // Opened after the caller was told to close other tabs: not used.
+      if (blocked) return d.close();
+      connection = d;
+      d.onversionchange = () => {
+        d.close();
+        forget(d);
       };
-      resolve(req.result);
+      d.onclose = () => forget(d);
+      resolve(d);
+    };
+    req.onblocked = () => {
+      blocked = true;
+      opening = undefined;
+      reject(new Error('Close other Skrivist Books tabs, then try again.'));
     };
     req.onerror = () => {
       opening = undefined;
       reject(req.error);
     };
   }));
+}
+/** A transaction on the library database, reopening a connection the browser closed. */
+export async function transaction(
+  stores: string | string[],
+  mode: IDBTransactionMode = 'readonly',
+): Promise<IDBTransaction> {
+  const d = await db();
+  try {
+    return d.transaction(stores, mode);
+  } catch (e) {
+    if ((e as DOMException).name !== 'InvalidStateError') throw e;
+    forget(d);
+    return (await db()).transaction(stores, mode);
+  }
 }
 function request<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -107,8 +140,7 @@ async function scrubRemotes(ids: string[]) {
     }
     return;
   }
-  const d = await db(),
-    tx = d.transaction('books', 'readwrite'),
+  const tx = await transaction('books', 'readwrite'),
     finished = done(tx),
     store = tx.objectStore('books');
   for (const id of ids) {
@@ -124,9 +156,7 @@ async function scrubRemotes(ids: string[]) {
 export async function listBooks(): Promise<Book[]> {
   const books: Book[] = isDesktop()
     ? await native('list', { store: 'books' })
-    : await request(
-        (await db()).transaction('books').objectStore('books').getAll(),
-      );
+    : await request((await transaction('books')).objectStore('books').getAll());
   const legacy: Book[] = [];
   const result = books.map((book) => {
     if (!book.remote) return book;
@@ -141,21 +171,17 @@ export async function listBooks(): Promise<Book[]> {
 export async function getBook(id: string): Promise<Book | undefined> {
   const book: Book | undefined = isDesktop()
     ? await nativeGet('books', id)
-    : await request(
-        (await db()).transaction('books').objectStore('books').get(id),
-      );
+    : await request((await transaction('books')).objectStore('books').get(id));
   // listBooks() rewrites stored remotes; a book opened by link may be read first.
   return book?.remote ? { ...book, remote: plainRemote(book.remote) } : book;
 }
 export async function getFile(id: string): Promise<Blob | undefined> {
   if (isDesktop()) return nativeGet('files', id);
-  const d = await db();
-  return request(d.transaction('files').objectStore('files').get(id));
+  return request((await transaction('files')).objectStore('files').get(id));
 }
 export async function getCover(id: string): Promise<Blob | undefined> {
   if (isDesktop()) return nativeGet('covers', id);
-  const d = await db();
-  return request(d.transaction('covers').objectStore('covers').get(id));
+  return request((await transaction('covers')).objectStore('covers').get(id));
 }
 export async function addBook(
   book: Book,
@@ -163,8 +189,7 @@ export async function addBook(
   cover?: Blob,
 ): Promise<Book> {
   if (isDesktop()) return native('books_add', { book, file, cover });
-  const d = await db(),
-    tx = d.transaction(['books', 'files', 'covers'], 'readwrite'),
+  const tx = await transaction(['books', 'files', 'covers'], 'readwrite'),
     finished = done(tx);
   let result = book;
   const req = tx.objectStore('books').get(book.id);
@@ -191,8 +216,7 @@ export async function updateBook(
   changes: Partial<Pick<Book, 'status' | 'position' | 'progress'>>,
 ): Promise<void> {
   if (isDesktop()) return native('books_update', { id, changes });
-  const d = await db(),
-    tx = d.transaction('books', 'readwrite'),
+  const tx = await transaction('books', 'readwrite'),
     finished = done(tx),
     store = tx.objectStore('books'),
     req = store.get(id);
@@ -203,8 +227,10 @@ export async function updateBook(
 }
 export async function deleteBook(id: string) {
   if (isDesktop()) return native('books_delete', { id });
-  const d = await db(),
-    tx = d.transaction(['books', 'files', 'covers', 'notes'], 'readwrite'),
+  const tx = await transaction(
+      ['books', 'files', 'covers', 'notes'],
+      'readwrite',
+    ),
     finished = done(tx);
   const notes = tx
     .objectStore('notes')

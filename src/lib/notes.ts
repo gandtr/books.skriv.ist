@@ -1,5 +1,5 @@
 import { isDesktop, native } from './desktop';
-import { db, type Book, type Position } from './store';
+import { transaction, type Book, type Position } from './store';
 export interface ReadingNote {
   id: string;
   bookId: string;
@@ -13,10 +13,9 @@ export interface ReadingNote {
 export type NoteLocation = { position: Position; section: string };
 export async function listNotes(bookId: string): Promise<ReadingNote[]> {
   if (isDesktop()) return (await native<ReadingNote[]>('list', { store: 'notes' })).filter(note => note.bookId === bookId).sort((a, b) => a.created - b.created);
-  const d = await db();
+  const tx = await transaction('notes');
   return new Promise((resolve, reject) => {
-    const r = d
-      .transaction('notes')
+    const r = tx
       .objectStore('notes')
       .index('bookId')
       .getAll(bookId);
@@ -37,9 +36,8 @@ export async function saveNote(note: ReadingNote): Promise<void> {
       'Keep quotations under 8,000 characters and notes under 16,000 characters.',
     );
   if (isDesktop()) return native('books_save_note', { note });
-  const d = await db();
+  const tx = await transaction(['books', 'notes'], 'readwrite');
   await new Promise<void>((resolve, reject) => {
-    const tx = d.transaction(['books', 'notes'], 'readwrite');
     const req = tx.objectStore('books').get(note.bookId);
     req.onsuccess = () => {
       if (!req.result) {
@@ -55,9 +53,8 @@ export async function saveNote(note: ReadingNote): Promise<void> {
 }
 export async function removeNote(id: string) {
   if (isDesktop()) return native('delete', { store: 'notes', key: id });
-  const d = await db();
+  const tx = await transaction('notes', 'readwrite');
   await new Promise<void>((resolve, reject) => {
-    const tx = d.transaction('notes', 'readwrite');
     tx.objectStore('notes').delete(id);
     tx.oncomplete = () => resolve();
     tx.onerror = tx.onabort = () => reject(tx.error);

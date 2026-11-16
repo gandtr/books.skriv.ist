@@ -31,7 +31,13 @@
       else if (event.key === '0') { event.preventDefault(); apply(1); }
     };
     window.addEventListener('keydown', shortcut, true);
-    return () => window.removeEventListener('keydown', shortcut, true);
+    // The control floats over the bottom-right corner, where the reader footer
+    // shows the page number; style.css reserves room for it under this class.
+    document.documentElement.classList.add('has-desktop-zoom');
+    return () => {
+      window.removeEventListener('keydown', shortcut, true);
+      document.documentElement.classList.remove('has-desktop-zoom');
+    };
   });
 </script>
 <div class="desktop-zoom" role="group" aria-label="Interface zoom" title={error || 'Interface zoom · Ctrl + / − · Ctrl 0 to reset'}>

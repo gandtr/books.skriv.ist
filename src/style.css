@@ -865,6 +865,16 @@ svg {
   color: var(--muted);
   border-top: 1px solid var(--line);
 }
+/* Desktop app: keep the page number clear of the fixed zoom control
+   (about 125px wide, 12px from the edge). */
+html.has-desktop-zoom .reader-footer {
+  padding-right: 150px;
+}
+/* The library footer ends in the bottom-right corner too: without room under
+   it, the last project link sat beneath the control and could not be clicked. */
+html.has-desktop-zoom .app-footer {
+  padding-bottom: 72px;
+}
 .reader-footer > span:first-child {
   max-width: 55%;
   white-space: nowrap;

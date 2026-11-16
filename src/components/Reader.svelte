@@ -97,7 +97,54 @@
     spread = Math.min(spreads - 1, Math.round(fraction * (spreads - 1)));
     content.style.transform = `translateX(${-spread * step}px)`;
   }
-  async function showChapter(index: number, position = 0, last = false) {
+  // The spread that holds the element a link fragment names, if it is here.
+  function anchorSpread(anchor: string) {
+    if (!anchor || !step) return;
+    const target = Array.from(
+      content.querySelectorAll<HTMLElement>('[id], a[name]'),
+    ).find((el) => el.id === anchor || el.getAttribute('name') === anchor);
+    if (!target) return;
+    // Both boxes carry the same translateX, so the difference is the offset
+    // in the column flow.
+    const offset =
+      target.getBoundingClientRect().left -
+      content.getBoundingClientRect().left;
+    return Math.min(spreads - 1, Math.max(0, Math.floor(offset / step)));
+  }
+  function showSpread(target: number) {
+    spread = target;
+    fraction = spreads > 1 ? spread / (spreads - 1) : 0;
+    content.style.transform = `translateX(${-spread * step}px)`;
+  }
+  // A link jump (footnote, cross-reference) keeps the place it left, so the
+  // footer can offer the way back.
+  let linkReturn: Position | undefined;
+  function followLink(index: number, anchor: string) {
+    if (loading) return;
+    const from = { chapter, fraction, page };
+    if (index !== chapter) {
+      linkReturn = from;
+      showChapter(index, 0, false, anchor);
+      return;
+    }
+    // Same chapter: no re-render; a missing anchor leaves the page alone.
+    const target = anchorSpread(anchor);
+    if (target === undefined || target === spread) return;
+    linkReturn = from;
+    showSpread(target);
+    persist();
+  }
+  function returnFromLink() {
+    const back = linkReturn;
+    linkReturn = undefined;
+    if (back) goToPosition(back);
+  }
+  async function showChapter(
+    index: number,
+    position = 0,
+    last = false,
+    anchor = '',
+  ) {
     if (!epub) return;
     selectedQuote = '';
     const request = ++sequence;
@@ -123,6 +170,9 @@
         spread = spreads - 1;
         fraction = 1;
         content.style.transform = `translateX(${-spread * step}px)`;
+      } else if (anchor) {
+        const target = anchorSpread(anchor);
+        if (target !== undefined) showSpread(target);
       }
       loading = false;
       readable = true;
@@ -242,9 +292,7 @@
     }
     const target = spread + delta;
     if (target >= 0 && target < spreads) {
-      spread = target;
-      fraction = spreads > 1 ? spread / (spreads - 1) : 0;
-      content.style.transform = `translateX(${-spread * step}px)`;
+      showSpread(target);
       persist();
     } else if (chapter + delta >= 0 && chapter + delta < total)
       showChapter(chapter + delta, delta > 0 ? 0 : 1, delta < 0);
@@ -331,7 +379,10 @@
             const link = (e.target as Element).closest('a[data-chapter]');
             if (link) {
               e.preventDefault();
-              showChapter(Number(link.getAttribute('data-chapter')));
+              followLink(
+                Number(link.getAttribute('data-chapter')),
+                link.getAttribute('data-anchor') || '',
+              );
             }
           });
           await showChapter(Math.min(chapter, total - 1), fraction);
@@ -548,7 +599,9 @@
       >{book.format === 'epub'
         ? `Chapter ${chapter + 1} of ${total} · ${spread + 1} / ${spreads}`
         : `Page ${page} of ${total}`}</span
-    >{#if atEnd && !completed}<button
+    >{#if linkReturn}<button class="quiet" onclick={returnFromLink}
+        >↩ Back to your page</button
+      >{/if}{#if atEnd && !completed}<button
         class="quiet"
         onclick={() => finish().catch((e) => (error = e.message))}
         >Finished? Mark read ✓</button

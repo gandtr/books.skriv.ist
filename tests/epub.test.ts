@@ -40,6 +40,10 @@ describe('EPUB', () => {
     );
     const fragment = await book.chapter(0);
     expect(fragment.querySelector('a')?.getAttribute('data-chapter')).toBe('1');
+    // The fragment is kept so the reader can turn to it.
+    expect(fragment.querySelector('a')?.getAttribute('data-anchor')).toBe(
+      'end',
+    );
     expect(fragment.querySelectorAll('a')[1].hasAttribute('href')).toBe(false);
   });
   it('rejects traversal and external paths', () => {

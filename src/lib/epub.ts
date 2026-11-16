@@ -314,6 +314,15 @@ export class Epub {
           if (chapter >= 0) {
             link.setAttribute('href', '#');
             link.setAttribute('data-chapter', String(chapter));
+            // The reader turns to the element the fragment names (a footnote).
+            const hash = href.indexOf('#');
+            let anchor = hash >= 0 ? href.slice(hash + 1) : '';
+            try {
+              anchor = decodeURIComponent(anchor);
+            } catch {
+              /* Keep the literal fragment. */
+            }
+            if (anchor) link.setAttribute('data-anchor', anchor);
           }
         } catch {
           /* Unsupported link. */

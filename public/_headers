@@ -4,6 +4,20 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self' https: http: blob: https://cloudflareinsights.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'none'
 
+# Unhashed entry files must be revalidated on every load, or a page kept
+# from an old deploy asks for hashed chunks that no longer exist. Explicit
+# no-cache, in case the zone's Browser Cache TTL raises max-age=0 (BOOKS-13).
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-cache
+/opds-hash.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache
+
 # Vite's hashed build output never changes under the same name.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable

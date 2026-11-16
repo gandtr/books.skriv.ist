@@ -282,12 +282,15 @@
       <nav aria-label="Main">
         <button
           class:active={view === 'library'}
+          aria-current={view === 'library' ? 'page' : undefined}
           onclick={() => (view = 'library')}>Library</button
         ><button
           class:active={view === 'catalogues'}
+          aria-current={view === 'catalogues' ? 'page' : undefined}
           onclick={() => (view = 'catalogues')}>Catalogues</button
         ><button
           class:active={view === 'calibre'}
+          aria-current={view === 'calibre' ? 'page' : undefined}
           onclick={() => (view = 'calibre')}>Calibre</button
         >
       </nav>
@@ -456,6 +459,7 @@
             <div class="status-tabs" role="group" aria-label="Reading status">
               {#each [['', 'All books'], ['reading', `Reading${reading ? ' · ' + reading : ''}`], ['unread', 'Unread'], ['read', 'Read']] as [value, label]}<button
                   class:active={status === value}
+                  aria-pressed={status === value}
                   onclick={() => {
                     status = value;
                     page = 0;

@@ -556,6 +556,7 @@
       </div>
       {#each sections as section, i}<button
           class:current={chapter === i}
+          aria-current={chapter === i ? 'true' : undefined}
           onclick={() => {
             toc = false;
             showChapter(i);

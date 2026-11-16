@@ -40,9 +40,10 @@
   <div class="library-folder">
     <p class="where"><strong>Library folder</strong> <span class="path">{place.path}</span></p>
     <p class="actions">
-      <button onclick={change} disabled={busy || disabled}>{busy ? 'Copying your library…' : 'Change folder…'}</button>
+      <button onclick={change} disabled={busy || disabled}>Change folder…</button>
       <button onclick={() => openLibraryFolder().catch((e) => (error = message(e)))} disabled={busy}>Open folder</button>
     </p>
+    {#if busy}<p role="status">Choose a folder in the window that opened. Copying a large library there can take a few minutes.</p>{/if}
     {#if error}<p class="caution" role="alert">{error}</p>{/if}
     {#if place.notice}<p role="status">{place.notice}</p>{/if}
     {#if place.private}<p class="caution">This folder belongs to the app and is removed if the app is uninstalled. Choose another folder to keep your library.</p>{/if}

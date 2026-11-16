@@ -19,6 +19,29 @@ function xml(text: string): Document {
     throw new Error('This EPUB contains invalid XML.');
   return doc;
 }
+// Chapters are XHTML: an HTML parse reads <title/> or <a id="p1"/> as open
+// tags and swallows or wraps the rest of the chapter. Files that are not
+// well-formed XML (undeclared &nbsp;) or declare entities keep the HTML parse.
+function xhtmlBody(text: string): Element | undefined {
+  if (/<!ENTITY/i.test(text)) return;
+  const doc = new DOMParser().parseFromString(text, 'application/xhtml+xml');
+  if (doc.getElementsByTagName('parsererror').length) return;
+  const body = doc.getElementsByTagNameNS(
+    'http://www.w3.org/1999/xhtml',
+    'body',
+  )[0];
+  if (!body) return;
+  // CDATA is text in XHTML, and an HTML document cannot import it.
+  const walker = doc.createTreeWalker(body, NodeFilter.SHOW_CDATA_SECTION);
+  const sections: Node[] = [];
+  while (walker.nextNode()) sections.push(walker.currentNode);
+  for (const node of sections)
+    node.parentNode?.replaceChild(
+      doc.createTextNode(node.nodeValue ?? ''),
+      node,
+    );
+  return body;
+}
 function local(doc: Document | Element, name: string): Element[] {
   return Array.from(doc.getElementsByTagNameNS('*', name));
 }
@@ -233,7 +256,7 @@ export class Epub {
     const section = this.info.sections[index];
     if (!section) throw new Error('Chapter not found.');
     const html = await this.text(section.path);
-    const fragment = DOMPurify.sanitize(html, {
+    const fragment = DOMPurify.sanitize(xhtmlBody(html) ?? html, {
       RETURN_DOM_FRAGMENT: true,
       USE_PROFILES: { html: true },
       FORBID_TAGS: [

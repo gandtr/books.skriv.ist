@@ -378,6 +378,8 @@ export class Epub {
         'link',
         'meta',
         'base',
+        'map',
+        'area',
       ],
       FORBID_ATTR: [
         'style',
@@ -387,6 +389,7 @@ export class Epub {
         'ping',
         'action',
         'formaction',
+        'usemap',
       ],
       ALLOW_DATA_ATTR: false,
     });

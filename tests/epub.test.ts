@@ -353,3 +353,19 @@ describe('table of contents', () => {
     book.close();
   });
 });
+
+// STORE-AUDIT L4: only <a> links are rewritten, so image-map areas must not
+// survive with their own href.
+it('drops image maps and their links', async () => {
+  const book = await Epub.open(
+    epubFile(
+      {},
+      '<p><img src="pic.png" alt="map" usemap="#m"/></p><map name="m"><area href="https://evil.example/login" shape="rect" coords="0,0,9,9"/><area href="#opds=https://evil.example/opds"/></map><p id="end">end</p>',
+    ),
+  );
+  const fragment = await book.chapter(0);
+  expect(fragment.querySelector('map, area, [usemap]')).toBeNull();
+  expect(fragment.querySelector('img')?.getAttribute('alt')).toBe('map');
+  expect(fragment.querySelector('#end')?.textContent).toBe('end');
+  book.close();
+});

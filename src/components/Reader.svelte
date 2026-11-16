@@ -348,10 +348,12 @@
       const saved = localStorage.getItem('books-paper');
       if (isPaper(saved)) paper = saved;
     } catch {}
-    font = Math.min(
-      30,
-      Math.max(14, Number(localStorage.getItem('books-font')) || 18),
-    );
+    try {
+      font = Math.min(
+        30,
+        Math.max(14, Number(localStorage.getItem('books-font')) || 18),
+      );
+    } catch {}
     let observer: ResizeObserver;
     (async () => {
       try {
@@ -481,7 +483,9 @@
   }
   function fontChange(delta: number) {
     font = Math.min(30, Math.max(14, font + delta));
-    localStorage.setItem('books-font', String(font));
+    try {
+      localStorage.setItem('books-font', String(font));
+    } catch {}
     layout();
   }
   $: atStart =

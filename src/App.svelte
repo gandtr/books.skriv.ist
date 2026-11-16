@@ -82,7 +82,9 @@
   }
   function changeTheme() {
     themeMode = theme === 'light' ? 'dark' : 'light';
-    localStorage.setItem('books-theme', themeMode);
+    try {
+      localStorage.setItem('books-theme', themeMode);
+    } catch {}
     applyTheme();
   }
   async function read(book: Book) {
@@ -137,7 +139,10 @@
     let disposed = false;
     let stopNative = () => {};
     if (isDesktop()) void watchNativeFiles(nativeAdd, fragment => { location.hash = fragment; }, message => { error = message; }).then(stop => { if (disposed) stop(); else stopNative = stop; });
-    themeMode = localStorage.getItem('books-theme') || 'system';
+    // Blocked site storage throws; the library's own error says why.
+    try {
+      themeMode = localStorage.getItem('books-theme') || 'system';
+    } catch {}
     applyTheme();
     const media = matchMedia('(prefers-color-scheme: dark)');
     media.addEventListener('change', applyTheme);

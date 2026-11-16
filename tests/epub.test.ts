@@ -315,3 +315,37 @@ describe('ZIP sizes', () => {
     ).rejects.toThrow('safe size limit');
   });
 });
+
+describe('table of contents', () => {
+  it('takes chapter titles from the toc nav only, first link first', async () => {
+    const book = await Epub.open(
+      epubFile({
+        'OPS/nav.xhtml': `<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><body>
+<nav epub:type="landmarks"><ol><li><a epub:type="cover" href="one.xhtml">Cover</a></li><li><a epub:type="bodymatter" href="two.xhtml">Start of Content</a></li></ol></nav>
+<nav epub:type="toc" id="toc"><ol><li><a href="one.xhtml">Morning</a></li><li><a href="two.xhtml">Evening</a><ol><li><a href="two.xhtml#s3">Section three</a></li></ol></li></ol></nav>
+<nav epub:type="page-list" hidden=""><ol><li><a href="one.xhtml#p27">27</a></li><li><a href="two.xhtml#p45">45</a></li></ol></nav>
+</body></html>`,
+      }),
+    );
+    expect(book.info.sections.map((s) => s.title)).toEqual([
+      'Morning',
+      'Evening',
+    ]);
+    book.close();
+  });
+  it('takes the first NCX label for a file', async () => {
+    const book = await Epub.open(
+      epubFile({
+        'OPS/package.opf':
+          '<package xmlns="http://www.idpf.org/2007/opf" version="2.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>A Small Book</dc:title></metadata><manifest><item id="one" href="one.xhtml" media-type="application/xhtml+xml"/><item id="two" href="two.xhtml" media-type="application/xhtml+xml"/><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/></manifest><spine toc="ncx"><itemref idref="one"/><itemref idref="two"/></spine></package>',
+        'OPS/toc.ncx':
+          '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap><navPoint id="a"><navLabel><text>Morning</text></navLabel><content src="one.xhtml"/><navPoint id="a1"><navLabel><text>Dawn</text></navLabel><content src="one.xhtml#dawn"/></navPoint></navPoint><navPoint id="b"><navLabel><text>Evening</text></navLabel><content src="two.xhtml"/></navPoint></navMap></ncx>',
+      }),
+    );
+    expect(book.info.sections.map((s) => s.title)).toEqual([
+      'Morning',
+      'Evening',
+    ]);
+    book.close();
+  });
+});

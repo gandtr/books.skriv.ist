@@ -284,14 +284,35 @@ export class Epub {
     const ncx = [...items.values()].find(
       (item) => item.type === 'application/x-dtbncx+xml',
     );
+    // A section takes the first title the table of contents gives it; later
+    // links to the same file are sub-headings.
+    const titled = new Set<Section>();
+    const name = (section: Section | undefined, title?: string | null) => {
+      if (!section || titled.has(section) || !title?.trim()) return;
+      section.title = title.trim();
+      titled.add(section);
+    };
     try {
       if (nav) {
         const doc = xml(await this.text(nav.path));
-        for (const link of local(doc, 'a')) {
+        // Only the toc list: landmarks and page-list link the same files.
+        const navs = local(doc, 'nav');
+        const toc =
+          navs.find((el) =>
+            (
+              el.getAttributeNS('http://www.idpf.org/2007/ops', 'type') ||
+              el.getAttribute('epub:type') ||
+              ''
+            )
+              .split(/\s+/)
+              .includes('toc'),
+          ) ?? navs[0];
+        for (const link of local(toc ?? doc, 'a')) {
           const path = resolvePath(link.getAttribute('href') || '', nav.path);
-          const section = sections.find((s) => s.path === path);
-          if (section)
-            section.title = link.textContent?.trim() || section.title;
+          name(
+            sections.find((s) => s.path === path),
+            link.textContent,
+          );
         }
       } else if (ncx) {
         const doc = xml(await this.text(ncx.path));
@@ -300,10 +321,10 @@ export class Epub {
             local(point, 'content')[0]?.getAttribute('src') || '',
             ncx.path,
           );
-          const section = sections.find((s) => s.path === path);
-          if (section)
-            section.title =
-              local(point, 'text')[0]?.textContent?.trim() || section.title;
+          name(
+            sections.find((s) => s.path === path),
+            local(point, 'text')[0]?.textContent,
+          );
         }
       }
     } catch {

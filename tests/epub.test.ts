@@ -269,7 +269,11 @@ describe('chapter sanitiser', () => {
 describe('ZIP sizes', () => {
   const bytesOf = async (file: Blob) =>
     new Uint8Array(await file.arrayBuffer());
-  const declare = (zip: Uint8Array, name: string, size: number) => {
+  const declare = (
+    zip: Uint8Array<ArrayBuffer>,
+    name: string,
+    size: number,
+  ) => {
     const view = new DataView(zip.buffer);
     const encoded = new TextEncoder().encode(name);
     for (let at = 0; at + 46 < zip.length; at++) {

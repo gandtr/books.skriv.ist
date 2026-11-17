@@ -135,9 +135,11 @@
     persist();
   }
   function returnFromLink() {
+    // goToPosition ignores a jump while a chapter loads; keep the way back.
+    if (loading || !linkReturn) return;
     const back = linkReturn;
     linkReturn = undefined;
-    if (back) goToPosition(back);
+    goToPosition(back);
   }
   async function showChapter(
     index: number,
@@ -613,8 +615,10 @@
       >{book.format === 'epub'
         ? `Chapter ${chapter + 1} of ${total} · ${spread + 1} / ${spreads}`
         : `Page ${page} of ${total}`}</span
-    >{#if linkReturn}<button class="quiet" onclick={returnFromLink}
-        >↩ Back to your page</button
+    >{#if linkReturn}<button
+        class="quiet"
+        disabled={loading}
+        onclick={returnFromLink}>↩ Back to your page</button
       >{/if}{#if atEnd && !completed}<button
         class="quiet"
         onclick={() => finish().catch((e) => (error = e.message))}

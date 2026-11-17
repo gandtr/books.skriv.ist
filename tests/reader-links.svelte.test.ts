@@ -2,6 +2,7 @@ import { mount, unmount } from 'svelte';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import Reader from '../src/components/Reader.svelte';
+import { Epub } from '../src/lib/epub';
 import { importBook } from '../src/lib/import';
 import { getBook } from '../src/lib/store';
 import { epubFile } from './fixtures';
@@ -115,4 +116,27 @@ it('leaves the page alone when a same-chapter fragment names nothing', async () 
   await new Promise((r) => setTimeout(r, 20));
   expect(footer()).toContain('Chapter 1 of 2 · 1 / 3');
   expect(backButton()).toBeUndefined();
+});
+
+it('keeps the way back when it is chosen while the linked chapter loads', async () => {
+  await open();
+  const chapter = Epub.prototype.chapter;
+  let release = () => {};
+  const loaded = new Promise<void>((r) => (release = r));
+  vi.spyOn(Epub.prototype, 'chapter').mockImplementation(async function (
+    this: Epub,
+    index: number,
+  ) {
+    if (index === 1) await loaded;
+    return chapter.call(this, index);
+  });
+  shadow()
+    .querySelector<HTMLAnchorElement>('a[data-anchor="page_12"]')!
+    .click();
+  await vi.waitFor(() => expect(backButton()).toBeDefined());
+  backButton()!.click();
+  release();
+  await vi.waitFor(() => expect(footer()).toContain('Chapter 2 of 2 · 2 / 3'));
+  backButton()!.click();
+  await vi.waitFor(() => expect(footer()).toContain('Chapter 1 of 2 · 1 / 3'));
 });

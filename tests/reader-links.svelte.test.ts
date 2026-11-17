@@ -53,7 +53,7 @@ async function open() {
   const book = await importBook(
     epubFile(
       {},
-      '<p>See note <a href="#fn3">3</a> and <a href="two.xhtml#page_12">page 12</a>.</p><p id="fn3">The note.</p>',
+      '<p>See note <a href="#fn3">3</a> and <a href="two.xhtml#page_12">page 12</a>.</p><p id="fn3">The note. <a href="one.xhtml">Start</a></p>',
     ),
   );
   reader = mount(Reader, {
@@ -138,5 +138,15 @@ it('keeps the way back when it is chosen while the linked chapter loads', async 
   release();
   await vi.waitFor(() => expect(footer()).toContain('Chapter 2 of 2 · 2 / 3'));
   backButton()!.click();
+  await vi.waitFor(() => expect(footer()).toContain('Chapter 1 of 2 · 1 / 3'));
+});
+
+it('turns to the chapter start for a same-chapter link without a fragment', async () => {
+  await open();
+  shadow().querySelector<HTMLAnchorElement>('a[data-anchor="fn3"]')!.click();
+  await vi.waitFor(() => expect(footer()).toContain('Chapter 1 of 2 · 3 / 3'));
+  shadow()
+    .querySelector<HTMLAnchorElement>('a[data-chapter="0"]:not([data-anchor])')!
+    .click();
   await vi.waitFor(() => expect(footer()).toContain('Chapter 1 of 2 · 1 / 3'));
 });

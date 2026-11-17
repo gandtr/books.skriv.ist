@@ -127,8 +127,9 @@
       showChapter(index, 0, false, anchor);
       return;
     }
-    // Same chapter: no re-render; a missing anchor leaves the page alone.
-    const target = anchorSpread(anchor);
+    // Same chapter: no re-render. No fragment means the chapter's start; a
+    // fragment that names nothing here leaves the page alone.
+    const target = anchor ? anchorSpread(anchor) : 0;
     if (target === undefined || target === spread) return;
     linkReturn = from;
     showSpread(target);

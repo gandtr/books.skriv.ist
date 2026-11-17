@@ -309,9 +309,18 @@
     });
     onchanged();
   }
+  // Resolves once every queued position save has landed, including any a
+  // page that finishes loading meanwhile adds.
+  export async function saved() {
+    let chain;
+    do {
+      chain = writeChain;
+      await chain;
+    } while (chain !== writeChain);
+  }
   async function close() {
     persist();
-    await writeChain;
+    await saved();
     onchanged();
     onclose();
   }

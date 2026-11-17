@@ -107,10 +107,16 @@
     // has not seen yet.
     if (open && active?.id !== open.id) await refresh();
   }
+  // The library or a reopened reader reads the stored position, so the
+  // outgoing reader's queued saves land first.
+  async function leaveReader() {
+    await reader?.saved();
+  }
   async function applyRoute() {
     // A pairing link from Armarium wins over a reading link in the same fragment.
     const link = takeOpdsLink();
     if (link) {
+      await leaveReader();
       active = undefined;
       view = 'catalogues';
       pairing = { url: link, id: pairing.id + 1 };
@@ -123,12 +129,16 @@
         return;
       }
       initialPosition = match.position;
+      await leaveReader();
       active = await getBook(match.id);
       if (!active) {
         error = 'That book is not stored on this device.';
         history.replaceState(null, '', location.pathname);
       }
-    } else active = undefined;
+    } else {
+      await leaveReader();
+      active = undefined;
+    }
   }
   let nativeIncoming: File[] = [];
   async function nativeAdd(files: File[]) {
